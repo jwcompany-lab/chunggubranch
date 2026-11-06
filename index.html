@@ -1,0 +1,3317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>글로벌금융판매 새길지사 - 행열 출결현황 관리 시스템</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans KR', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .status-btn {
+      transition: all 0.12s ease-in-out;
+    }
+    .status-btn:active {
+      transform: scale(0.94);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(16px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .animate-slide-up {
+      animation: slideUp 0.2s ease-out forwards;
+    }
+    /* Sticky table columns and headers for matrix sheet */
+    .sticky-col-left {
+      position: sticky;
+      left: 0;
+      z-index: 15;
+    }
+    .sticky-col-right {
+      position: sticky;
+      right: 0;
+      z-index: 15;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col pb-20 md:pb-8">
+
+  <!-- Top Header -->
+  <header class="sticky top-0 z-30 bg-slate-900 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-lg shadow-inner shrink-0">
+          새길
+        </div>
+        <div class="truncate">
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base md:text-lg tracking-tight truncate">글로벌금융판매 새길지사 출결현황표</h1>
+            <span id="syncStatusBadge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>자동저장됨
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 truncate">전체 · 대전 · 청주 · 천안 · 충주 (구분 추가 가능) | 행·열 출결 및 비율(%) 자동합산</p>
+        </div>
+      </div>
+
+      <!-- Role & Cloud Sync Controls -->
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="btnOpenSyncModal" onclick="openSyncModal()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span class="hidden sm:inline">핸드폰·시트 연동</span>
+        </button>
+
+        <button id="btnRoleSwitch" onclick="openRoleModal()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          <span id="currentRoleLabel">관리자: 김종욱 대표</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Desktop Navigation Tabs -->
+    <div class="bg-slate-800/80 border-t border-slate-700/70 hidden md:block">
+      <div class="max-w-7xl mx-auto px-4 flex items-center justify-between">
+        <nav class="flex space-x-1" aria-label="Tabs">
+          <button id="deskTabMatrix" onclick="switchTab('matrix')" class="tab-nav-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-blue-400 text-white flex items-center gap-2">
+            <span>📋 월간 행열 출결부 (메인)</span>
+          </button>
+          <button id="deskTabCheckin" onclick="switchTab('checkin')" class="tab-nav-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white flex items-center gap-2">
+            <span>✅ 당일 출결 체크</span>
+          </button>
+          <button id="deskTabWeekly" onclick="switchTab('weekly')" class="tab-nav-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white flex items-center gap-2">
+            <span>📅 주간 출결 현황</span>
+            <span class="px-1.5 py-0.2 text-[10px] rounded bg-blue-500/30 text-blue-200">관리자</span>
+          </button>
+          <button id="deskTabMonthly" onclick="switchTab('monthly')" class="tab-nav-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white flex items-center gap-2">
+            <span>📊 월간 통계·분석</span>
+            <span class="px-1.5 py-0.2 text-[10px] rounded bg-blue-500/30 text-blue-200">관리자</span>
+          </button>
+          <button id="deskTabMembers" onclick="switchTab('members')" class="tab-nav-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white flex items-center gap-2">
+            <span>👥 설계사·권한 관리</span>
+            <span class="px-1.5 py-0.2 text-[10px] rounded bg-blue-500/30 text-blue-200">관리자</span>
+          </button>
+        </nav>
+        <div class="text-xs text-slate-300 py-2 flex items-center gap-3">
+          <span id="headerSummaryText">전체 30명 | 오늘 출근율 0%</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-4 py-4 space-y-4">
+
+    <!-- ==================== DYNAMIC BRANCH TABS & QUICK INPUT BAR ==================== -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3.5 sm:p-4 space-y-3">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <!-- Branch Tabs: 전체 + 대전, 청주, 천안, 충주 + 추후 구분 추가 -->
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 lg:pb-0">
+          <span class="text-xs font-bold text-slate-500 mr-1 shrink-0">지사 구분:</span>
+          <!-- Static IDs preserved for validator + dynamic container -->
+          <div id="branchTabsContainer" class="flex items-center gap-1.5">
+            <button id="branchBtnAll" onclick="setBranchFilter('전체')" class="branch-pill px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 text-white shrink-0 transition">전체 (30)</button>
+            <button id="branchBtnDaejeon" onclick="setBranchFilter('대전지사')" class="branch-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition">대전지사</button>
+            <button id="branchBtnCheongju" onclick="setBranchFilter('청주지사')" class="branch-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition">청주지사</button>
+            <button id="branchBtnCheonan" onclick="setBranchFilter('천안지사')" class="branch-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition">천안지사</button>
+            <button id="branchBtnChungju" onclick="setBranchFilter('충주지사')" class="branch-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition">충주지사</button>
+          </div>
+          <div id="customBranchTabsContainer" class="flex items-center gap-1.5"></div>
+          <button id="btnOpenBranchManager" onclick="openBranchManageModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 shrink-0 transition flex items-center gap-1">
+            <span>+ 구분 추가·관리</span>
+          </button>
+        </div>
+
+        <!-- Date Navigation & Quick Report Share -->
+        <div class="flex flex-wrap items-center justify-between sm:justify-end gap-2">
+          <div class="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
+            <button id="btnPrevDay" onclick="changeDateBy(-1)" class="p-1.5 rounded-lg hover:bg-white text-slate-700 transition" title="이전 날짜">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <input id="selectedDateInput" type="date" onchange="onDateInputChange(this.value)" class="bg-transparent text-xs sm:text-sm font-bold text-slate-800 px-2 py-1 focus:outline-none cursor-pointer" />
+            <button id="btnNextDay" onclick="changeDateBy(1)" class="p-1.5 rounded-lg hover:bg-white text-slate-700 transition" title="다음 날짜">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7-7"/></svg>
+            </button>
+            <button id="btnToday" onclick="setToday()" class="ml-1 px-2.5 py-1 rounded-lg bg-white text-blue-600 font-semibold text-xs shadow-sm border border-slate-200/80 hover:bg-blue-50 transition">오늘</button>
+          </div>
+
+          <button id="btnCopyDailyReport" onclick="copyReportSummary()" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+            </svg>
+            <span>카톡 브리핑 복사</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Inline Roster Quick Input Bar -->
+      <div class="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-700 shrink-0">
+          <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+          <span>명단 바로 입력:</span>
+        </div>
+        <select id="inlineAddBranchSelect" class="px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-slate-50 text-slate-800 shrink-0">
+          <!-- Populated dynamically with branches -->
+        </select>
+        <input id="inlineAddNamesInput" type="text" onkeydown="if(event.key==='Enter'){addInlineMembersFromBar();}" placeholder="설계사 이름 입력 (한 명 또는 '김철수, 이영희, 박민수'처럼 쉼표로 여러 명 동시 입력 후 엔터)" class="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+        <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+          <button id="btnInlineAddSubmit" onclick="addInlineMembersFromBar()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs transition">
+            + 명단 추가
+          </button>
+          <button id="btnQuickAddMemberTop" onclick="openAddMemberModal()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition">
+            + 설계사 빠른 등록
+          </button>
+          <button id="btnUndoDeleteMember" onclick="undoLastDeletedMember()" class="hidden px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs transition">
+            ↩ 삭제 취소(복구)
+          </button>
+          <button id="btnClearBranchRosterTop" onclick="openClearCurrentBranchModal()" class="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs transition">
+            🗑️ 명단 전체 비우기
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPI Summary Cards -->
+    <section class="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3">
+      <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm">
+        <div class="text-[11px] font-medium text-slate-500">조회 대상</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpiTotalCount" class="text-xl sm:text-2xl font-bold text-slate-900">30명</span>
+          <span id="kpiRateBadge" class="text-[11px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">90%</span>
+        </div>
+      </div>
+      <div class="bg-emerald-50/70 rounded-2xl p-3 border border-emerald-200 shadow-sm">
+        <div class="text-[11px] font-semibold text-emerald-700">정상 출근</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpiPresentCount" class="text-xl sm:text-2xl font-bold text-emerald-700">0명</span>
+          <span class="text-[11px] text-emerald-600">사무실</span>
+        </div>
+      </div>
+      <div class="bg-blue-50/70 rounded-2xl p-3 border border-blue-200 shadow-sm">
+        <div class="text-[11px] font-semibold text-blue-700">외근·미팅</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpiFieldCount" class="text-xl sm:text-2xl font-bold text-blue-700">0명</span>
+          <span class="text-[11px] text-blue-600">현장·병원</span>
+        </div>
+      </div>
+      <div class="bg-amber-50/70 rounded-2xl p-3 border border-amber-200 shadow-sm">
+        <div class="text-[11px] font-semibold text-amber-700">지각</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpiLateCount" class="text-xl sm:text-2xl font-bold text-amber-700">0명</span>
+          <span class="text-[11px] text-amber-600">9시 이후</span>
+        </div>
+      </div>
+      <div class="bg-purple-50/70 rounded-2xl p-3 border border-purple-200 shadow-sm">
+        <div class="text-[11px] font-semibold text-purple-700">휴가·반차</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpiLeaveCount" class="text-xl sm:text-2xl font-bold text-purple-700">0명</span>
+          <span class="text-[11px] text-purple-600">사전승인</span>
+        </div>
+      </div>
+      <div class="bg-rose-50/70 rounded-2xl p-3 border border-rose-200 shadow-sm">
+        <div class="text-[11px] font-semibold text-rose-700">결근·미체크</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpiAbsentCount" class="text-xl sm:text-2xl font-bold text-rose-700">0명</span>
+          <span id="kpiUncheckedSub" class="text-[11px] text-rose-600">미체크 0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 0 (MAIN): MONTHLY ROW-COLUMN MATRIX SHEET ==================== -->
+    <section id="viewMatrix" class="space-y-4">
+      <!-- Matrix Control Header -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white" id="matrixCurrentBranchBadge">전체</span>
+              <h2 class="text-base sm:text-lg font-bold text-slate-900" id="matrixSheetTitle">2026년 11월 행·열 출결 현황표</h2>
+            </div>
+            <p class="text-xs text-slate-500 mt-1" id="matrixGuideDesc">
+              셀을 클릭하면 즉시 출근 여부가 체크되며, <strong>우측 끝에는 설계사별 월 누적 출근일수/기준일수(%)</strong>, <strong>하단 끝에는 날짜별 출근인원/전체인원(%)</strong>가 자동 합산됩니다.
+            </p>
+          </div>
+
+          <!-- Controls: Month selector, Workday denominator mode, Orientation toggle, Check mode, CSV Export -->
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Month Selector (Multi-year dynamic + Prev/Next month buttons) -->
+            <div class="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-xl border border-slate-200">
+              <button id="btnMatrixPrevMonth" type="button" onclick="changeMonthBy(-1)" class="px-1.5 py-0.5 rounded hover:bg-white text-slate-700 font-bold text-xs transition" title="이전 달">◀</button>
+              <span class="text-[11px] font-semibold text-slate-500">조회월:</span>
+              <select id="matrixMonthSelect" onchange="onMatrixMonthChange(this.value)" class="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer">
+                <option value="2026-11">2026년 11월</option>
+                <option value="2026-10">2026년 10월</option>
+                <option value="2026-12">2026년 12월</option>
+              </select>
+              <button id="btnMatrixNextMonth" type="button" onclick="changeMonthBy(1)" class="px-1.5 py-0.5 rounded hover:bg-white text-slate-700 font-bold text-xs transition" title="다음 달">▶</button>
+            </div>
+
+            <!-- Standard Working Days Denominator Mode -->
+            <div class="flex items-center gap-1 bg-slate-100 px-2.5 py-1.5 rounded-xl border border-slate-200">
+              <span class="text-[11px] font-semibold text-slate-500">전체 출근일수 기준:</span>
+              <select id="matrixDenomModeSelect" onchange="onMatrixDenomModeChange(this.value)" class="bg-transparent text-xs font-bold text-blue-700 focus:outline-none cursor-pointer">
+                <option value="month_weekdays">월 평일 영업일수 (21일)</option>
+                <option value="elapsed_weekdays">오늘까지 경과 평일수</option>
+                <option value="month_all_days">월 전체 달력일수 (30일)</option>
+                <option value="custom">직접 입력</option>
+              </select>
+              <input id="matrixCustomDenomInput" type="number" min="1" max="31" value="21" onchange="onCustomDenomChange(this.value)" class="hidden w-12 px-1 py-0.5 text-center text-xs font-bold bg-white border border-slate-300 rounded" />
+            </div>
+
+            <!-- Click Mode: Quick O/X vs Multi-Status -->
+            <div class="flex items-center gap-1 bg-slate-100 px-2.5 py-1.5 rounded-xl border border-slate-200">
+              <span class="text-[11px] font-semibold text-slate-500">터치 방식:</span>
+              <select id="matrixClickModeSelect" onchange="onMatrixClickModeChange(this.value)" class="bg-transparent text-xs font-bold text-emerald-700 focus:outline-none cursor-pointer">
+                <option value="quick_ox">원터치 출근(O) ↔ 미체크(-)</option>
+                <option value="cycle_all">상세 순환 (출근→외근→지각→휴가→결근)</option>
+              </select>
+            </div>
+
+            <!-- Orientation Toggle Button -->
+            <button id="btnToggleMatrixOrientation" onclick="toggleMatrixOrientation()" class="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition flex items-center gap-1">
+              <span>🔄 행·열 축 전환</span>
+            </button>
+
+            <!-- Export Matrix CSV -->
+            <button id="btnExportMatrixCsv" onclick="exportMatrixCSV()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs">
+              <span>📥 현재 행열표 엑셀(CSV) 다운로드</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Legend & Quick Actions Row -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-slate-500 font-medium">표기 안내:</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">✓ 출근 (출석인정)</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">외 외근·미팅 (출석인정)</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">지 지각 (출석인정)</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-semibold">휴 휴가·반차</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-semibold">X 결근</span>
+            <span class="text-slate-500">| 💡 이름 옆 <strong>[✕]</strong> 버튼을 누르거나 이름을 지우면 해당 설계사가 즉시 삭제됩니다.</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnMatrixTodayAllPresent" onclick="markAllPresentForSelectedDate()" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs transition">
+              선택일(${TODAY_STR.slice(5)}) 전원 출근 체크
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Matrix Table Wrapper -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto max-h-[640px] overflow-y-auto">
+          <table id="attendanceMatrixTable" class="w-full border-collapse text-xs select-none">
+            <thead id="matrixTableHead" class="sticky top-0 z-20 bg-slate-100 text-slate-700 border-b border-slate-300">
+              <!-- Populated by JS -->
+            </thead>
+            <tbody id="matrixTableBody" class="divide-y divide-slate-200">
+              <!-- Populated by JS -->
+            </tbody>
+            <tfoot id="matrixTableFoot" class="sticky bottom-0 z-20 bg-slate-900 text-white font-bold border-t-2 border-slate-700">
+              <!-- Populated by JS -->
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 1: DAILY CHECK-IN ==================== -->
+    <section id="viewCheckin" class="hidden space-y-4">
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-4 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 text-[11px] font-bold bg-white/20 rounded-full">모바일 간편 출석</span>
+            <span id="liveClockText" class="text-xs text-blue-100 font-mono">18:52:00</span>
+          </div>
+          <h2 class="text-base sm:text-lg font-bold mt-1">설계사 이름을 검색하거나 터치해 당일 출결을 바로 체크하세요</h2>
+          <p class="text-xs text-blue-100 mt-0.5">체크 즉시 월간 행열 출결부와 주간·월간 통계에 실시간 반영됩니다.</p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="btnBulkCheckPresent" onclick="markAllUncheckedPresent()" class="px-3.5 py-2 rounded-xl bg-blue-500/40 hover:bg-blue-500/60 border border-white/30 text-white font-semibold text-xs transition">
+            미체크 전원 출근처리
+          </button>
+        </div>
+      </div>
+
+      <!-- Search & Status Filter Toolbar -->
+      <div class="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div class="relative flex-1">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input id="searchPlannerInput" type="text" oninput="renderDailyCheckinList()" placeholder="설계사 이름, 직급, 지사, 메모 검색 (예: 김종욱, 대전, 병원)..." class="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white" />
+          <button id="btnClearSearch" onclick="clearPlannerSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs px-1">✕</button>
+        </div>
+
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <button id="statusFilterAll" onclick="setStatusFilter('전체')" class="status-filter-pill px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-white shrink-0">전체</button>
+          <button id="statusFilterUnchecked" onclick="setStatusFilter('미체크')" class="status-filter-pill px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0">미체크</button>
+          <button id="statusFilterPresent" onclick="setStatusFilter('출근')" class="status-filter-pill px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 shrink-0">출근</button>
+          <button id="statusFilterField" onclick="setStatusFilter('외근')" class="status-filter-pill px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 shrink-0">외근·미팅</button>
+          <button id="statusFilterLate" onclick="setStatusFilter('지각')" class="status-filter-pill px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 shrink-0">지각</button>
+          <button id="statusFilterLeave" onclick="setStatusFilter('휴가')" class="status-filter-pill px-2.5 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 shrink-0">휴가·반차</button>
+          <button id="statusFilterAbsent" onclick="setStatusFilter('결근')" class="status-filter-pill px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-700 hover:bg-rose-100 shrink-0">결근</button>
+        </div>
+      </div>
+
+      <!-- Planner Check-in Cards List -->
+      <div id="dailyPlannerGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+    </section>
+
+    <!-- ==================== TAB 2: WEEKLY DASHBOARD (MANAGERS) ==================== -->
+    <section id="viewWeekly" class="hidden space-y-4">
+      <div id="weeklyManagerNotice" class="bg-slate-900 text-white rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 shrink-0">
+            📅
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="font-bold text-base">주간 출결 데이터 현황표</h2>
+              <span id="weeklyAuthBadge" class="px-2 py-0.5 text-[11px] rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-semibold">지정 관리자 열람중</span>
+            </div>
+            <p id="weeklyRangeSubtitle" class="text-xs text-slate-300 mt-0.5">선택한 주의 월요일~토요일 설계사별 출결 현황과 주간 출근율을 집계합니다.</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnPrevWeek" onclick="changeWeekBy(-1)" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium border border-slate-700">◀ 이전 주</button>
+          <button id="btnThisWeek" onclick="setToday()" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold">이번 주</button>
+          <button id="btnNextWeek" onclick="changeWeekBy(1)" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium border border-slate-700">다음 주 ▶</button>
+          <button id="btnExportWeeklyCsv" onclick="exportWeeklyCSV()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold flex items-center gap-1">
+            <span>📥 엑셀(CSV)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-800">요일별 출결 인원 추이 (주간)</h3>
+            <span class="text-xs text-slate-500">출근 + 외근·미팅 합산</span>
+          </div>
+          <div class="relative h-60">
+            <canvas id="weeklyTrendChart"></canvas>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-800">지사 구분별 주간 평균 출근율 비교</h3>
+            <span class="text-xs text-slate-500">전체 등록 지사 비교</span>
+          </div>
+          <div class="relative h-60">
+            <canvas id="weeklyBranchChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">설계사별 주간 출결 매트릭스 (클릭 시 상태 즉시 변경 가능)</h3>
+            <p class="text-xs text-slate-500">각 요일 배지를 클릭하면 출근 → 외근 → 지각 → 휴가 → 결근 순으로 빠르게 전환됩니다.</p>
+          </div>
+          <div class="flex items-center gap-2 text-[11px] font-medium">
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">출근</span>
+            <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800">외근</span>
+            <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">지각</span>
+            <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800">휴가</span>
+            <span class="px-2 py-0.5 rounded bg-rose-100 text-rose-800">결근</span>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse min-w-[720px]">
+            <thead>
+              <tr id="weeklyTableHeadRow" class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600"></tr>
+            </thead>
+            <tbody id="weeklyTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: MONTHLY REPORT (MANAGERS) ==================== -->
+    <section id="viewMonthly" class="hidden space-y-4">
+      <div class="bg-slate-900 text-white rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+            📊
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 id="monthlyTitleText" class="font-bold text-base">2026년 11월 월간 출결 종합 데이터</h2>
+              <span class="px-2 py-0.5 text-[11px] rounded-full bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 font-semibold">지정 관리자 전용</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-0.5">소속 설계사별 월 누적 출근·외근·지각·휴가·결근 일수 및 출근율 순위를 제공합니다.</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 bg-slate-800 rounded-xl p-1 border border-slate-700">
+            <button id="btnReportPrevMonth" type="button" onclick="changeMonthBy(-1)" class="px-2 py-1 rounded-lg hover:bg-slate-700 text-slate-200 text-xs font-bold transition" title="이전 달">◀</button>
+            <select id="monthSelector" onchange="onMonthSelectChange(this.value)" class="px-2 py-1 rounded-lg bg-slate-800 text-white text-xs font-semibold focus:outline-none cursor-pointer">
+              <option value="2026-11">2026년 11월 (현재월)</option>
+              <option value="2026-10">2026년 10월 (전월)</option>
+              <option value="2026-12">2026년 12월 (익월)</option>
+            </select>
+            <button id="btnReportNextMonth" type="button" onclick="changeMonthBy(1)" class="px-2 py-1 rounded-lg hover:bg-slate-700 text-slate-200 text-xs font-bold transition" title="다음 달">▶</button>
+          </div>
+          <button id="btnExportMonthlyCsv" onclick="exportMonthlyCSV()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold flex items-center gap-1">
+            <span>📥 월간 엑셀(CSV) 저장</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm lg:col-span-2">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-800">월간 일자별 출근율 추이 (%)</h3>
+            <span class="text-xs text-slate-500">평일 영업일 기준</span>
+          </div>
+          <div class="relative h-60">
+            <canvas id="monthlyDailyRateChart"></canvas>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-800">월간 출결 유형 비중</h3>
+            <span id="monthlyTotalDaysLabel" class="text-xs text-slate-500">누적 집계</span>
+          </div>
+          <div class="relative h-60">
+            <canvas id="monthlyTypeDoughnutChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">설계사별 월간 출결 집계표</h3>
+            <p class="text-xs text-slate-500">설계사 이름을 클릭하면 해당 설계사의 월간 일자별 상세 캘린더를 확인할 수 있습니다.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-500 font-medium">정렬:</label>
+            <select id="monthlySortSelect" onchange="renderMonthlyView()" class="text-xs border border-slate-200 rounded-lg px-2.5 py-1 bg-slate-50 font-medium">
+              <option value="rate_desc">출근율 높은순</option>
+              <option value="rate_asc">출근율 낮은순 (관리필요)</option>
+              <option value="late_desc">지각/결근 많은순</option>
+              <option value="branch">지사·이름순</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse min-w-[680px]">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
+                <th class="py-3 px-4">순위</th>
+                <th class="py-3 px-4">설계사 정보</th>
+                <th class="py-3 px-3 text-center">소속 구분</th>
+                <th class="py-3 px-3 text-center text-emerald-700">정상출근</th>
+                <th class="py-3 px-3 text-center text-blue-700">외근·미팅</th>
+                <th class="py-3 px-3 text-center text-amber-700">지각</th>
+                <th class="py-3 px-3 text-center text-purple-700">휴가·반차</th>
+                <th class="py-3 px-3 text-center text-rose-700">결근</th>
+                <th class="py-3 px-4 text-right">월간 출근일수 / 기준 (%)</th>
+              </tr>
+            </thead>
+            <tbody id="monthlyTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: MEMBERS & DESIGNATED MANAGERS ==================== -->
+    <section id="viewMembers" class="hidden space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">➕ 소속 설계사 등록</h2>
+            <p class="text-xs text-slate-500 mt-0.5">개별 추가 또는 명단 복사·붙여넣기로 한 번에 등록하세요.</p>
+          </div>
+
+          <div class="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+            <h3 class="text-xs font-bold text-slate-700">개별 설계사/관리자 추가</h3>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">이름 *</label>
+              <input id="newMemberName" type="text" placeholder="예: 박새길" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] font-medium text-slate-600 mb-1">소속 구분(지사)</label>
+                <select id="newMemberBranch" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs bg-white"></select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-medium text-slate-600 mb-1">직책/구분</label>
+                <select id="newMemberRoleTitle" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs bg-white">
+                  <option value="설계사">설계사 (RP)</option>
+                  <option value="팀장">팀장 (부지점장)</option>
+                  <option value="지점장">지점장</option>
+                  <option value="총무/스탭">총무/스탭</option>
+                  <option value="대표">대표</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">연락처 (선택)</label>
+              <input id="newMemberPhone" type="text" placeholder="010-0000-0000" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white" />
+            </div>
+            <label class="flex items-center gap-2 pt-1 cursor-pointer">
+              <input id="newMemberIsManager" type="checkbox" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+              <span class="text-xs font-semibold text-slate-800">주간·월간 데이터 열람 관리자 권한 부여</span>
+            </label>
+            <button id="btnSubmitSingleMember" onclick="addSingleMember()" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-sm transition">
+              명단에 추가하기
+            </button>
+          </div>
+
+          <div class="space-y-3 bg-indigo-50/50 p-3.5 rounded-xl border border-indigo-200/80">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold text-indigo-950">📋 여러 명 이름 한 번에 일괄 등록</h3>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 font-semibold">엑셀·카톡 복붙 지원</span>
+            </div>
+            <p class="text-[11px] text-slate-600 leading-relaxed">
+              이름만 줄바꿈(엔터)이나 쉼표(,)로 구분해 넣거나, <code class="bg-white px-1 rounded">이름, 구분, 직책</code> 형식으로 입력하면 한 번에 등록됩니다.
+            </p>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">기본 배정 지사 (미입력 시)</label>
+              <select id="bulkDefaultBranch" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white mb-2"></select>
+              <textarea id="bulkMemberTextarea" rows="4" placeholder="예시:&#10;김민준, 대전지사, 팀장&#10;이서연, 청주지사, 설계사&#10;박지훈&#10;최유진" class="w-full p-2.5 rounded-lg border border-slate-300 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+            </div>
+            <button id="btnSubmitBulkMembers" onclick="addBulkMembers()" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm transition">
+              일괄 등록 실행
+            </button>
+          </div>
+        </div>
+
+        <div class="lg:col-span-2 space-y-4">
+          <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-base font-bold text-slate-900">🔐 지정 관리자(열람 권한자) 설정</h2>
+                  <span id="managerCountBadge" class="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-800">지정 관리자 6명</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">관리자로 지정된 인원만 주간·월간 출결 통계와 전체 지사 데이터를 열람·다운로드할 수 있습니다.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-xs font-semibold text-slate-600">관리자 공통 PIN:</label>
+                <input id="adminPinInput" type="text" maxlength="6" value="0000" onchange="updateAdminPin(this.value)" class="w-20 px-2.5 py-1 text-center font-mono font-bold text-xs border border-slate-300 rounded-lg bg-slate-50" />
+              </div>
+            </div>
+            <div id="designatedManagersPills" class="mt-3 flex flex-wrap gap-2"></div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">전체 소속 설계사 명단 및 권한 관리</h3>
+                <p class="text-xs text-slate-500">이름을 직접 수정하거나 소속 구분 변경 및 [관리자 지정] 스위치를 설정할 수 있습니다.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="btnClearToBlankRoster" onclick="openClearRosterModal()" class="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold border border-rose-200 transition">
+                  명단 비우기(직접입력 시작)
+                </button>
+                <button id="btnRestoreDemoData" onclick="openResetDemoModal()" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition">
+                  기본 샘플 복원
+                </button>
+              </div>
+            </div>
+            <div class="overflow-x-auto max-h-[520px] overflow-y-auto">
+              <table class="w-full text-left border-collapse min-w-[580px]">
+                <thead class="sticky top-0 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 z-10">
+                  <tr>
+                    <th class="py-2.5 px-4">이름 / 직책</th>
+                    <th class="py-2.5 px-3">소속 지사(구분)</th>
+                    <th class="py-2.5 px-3">연락처</th>
+                    <th class="py-2.5 px-3 text-center">열람 범위</th>
+                    <th class="py-2.5 px-3 text-center">관리자 지정</th>
+                    <th class="py-2.5 px-4 text-right">관리</th>
+                  </tr>
+                </thead>
+                <tbody id="rosterTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 shadow-lg">
+    <div class="grid grid-cols-5 h-16">
+      <button id="mobTabMatrix" onclick="switchTab('matrix')" class="mob-nav-btn flex flex-col items-center justify-center gap-1 text-blue-600 font-bold bg-blue-50/50">
+        <span class="text-base">📋</span>
+        <span class="text-[10px]">행열출결</span>
+      </button>
+      <button id="mobTabCheckin" onclick="switchTab('checkin')" class="mob-nav-btn flex flex-col items-center justify-center gap-1 text-slate-500 font-medium">
+        <span class="text-base">✅</span>
+        <span class="text-[10px]">당일 출결</span>
+      </button>
+      <button id="mobTabWeekly" onclick="switchTab('weekly')" class="mob-nav-btn flex flex-col items-center justify-center gap-1 text-slate-500 font-medium">
+        <span class="text-base">📅</span>
+        <span class="text-[10px]">주간 현황</span>
+      </button>
+      <button id="mobTabMonthly" onclick="switchTab('monthly')" class="mob-nav-btn flex flex-col items-center justify-center gap-1 text-slate-500 font-medium">
+        <span class="text-base">📊</span>
+        <span class="text-[10px]">월간 통계</span>
+      </button>
+      <button id="mobTabMembers" onclick="switchTab('members')" class="mob-nav-btn flex flex-col items-center justify-center gap-1 text-slate-500 font-medium">
+        <span class="text-base">👥</span>
+        <span class="text-[10px]">명단·관리자</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- 0. Branch / Division Add & Manage Modal -->
+  <div id="modalBranchManage" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl animate-slide-up space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="font-bold text-base text-slate-900">🏢 지사/구분 추가 · 이름변경 · 삭제</h3>
+          <p class="text-xs text-slate-500 mt-0.5">기본 지사를 포함한 모든 구분의 이름을 수정하거나 삭제·추가할 수 있습니다.</p>
+        </div>
+        <button id="btnCloseBranchModal" onclick="closeBranchManageModal()" class="text-slate-400 hover:text-slate-600 text-sm px-2 py-1">✕</button>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="newBranchNameInput" type="text" onkeydown="if(event.key==='Enter'){addCustomBranch();}" placeholder="새 구분 이름 입력 (예: 세종, 아산, 인하우스팀)" class="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <button id="btnAddCustomBranch" onclick="addCustomBranch()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shrink-0">
+          + 구분 추가
+        </button>
+      </div>
+      <div class="flex items-center justify-between gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 text-[11px]">
+        <div class="flex items-center gap-1.5 text-slate-600">
+          <span class="font-semibold">구분 삭제 시 소속 인원:</span>
+          <select id="branchDeleteMemberMode" class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-800">
+            <option value="delete_members">함께 삭제 (복구 가능)</option>
+            <option value="move_members">다른 지사로 자동 이동</option>
+          </select>
+        </div>
+        <button id="btnUndoBranchDelete" onclick="undoLastDeletedBranch()" class="hidden px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-[11px] transition">
+          ↩ 구분 복구
+        </button>
+      </div>
+      <div class="space-y-2 max-h-72 overflow-y-auto pr-0.5" id="branchManageListContainer">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. Quick Add Member Modal -->
+  <div id="modalAddMember" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl animate-slide-up space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-base text-slate-900">설계사 빠른 등록</h3>
+        <button id="btnCloseAddModal" onclick="closeAddMemberModal()" class="text-slate-400 hover:text-slate-600 text-sm px-2 py-1">✕</button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">설계사 이름 (쉼표로 여러 명 동시 입력 가능)</label>
+          <input id="quickModalNameInput" type="text" placeholder="예: 홍길동 또는 홍길동, 이영희, 박민수" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">소속 지사(구분)</label>
+            <select id="quickModalBranchSelect" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm bg-white"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">직책</label>
+            <select id="quickModalRoleSelect" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm bg-white">
+              <option value="설계사">설계사</option>
+              <option value="팀장">팀장</option>
+              <option value="지점장">지점장</option>
+              <option value="총무/스탭">총무/스탭</option>
+            </select>
+          </div>
+        </div>
+        <label class="flex items-center gap-2 pt-1 cursor-pointer">
+          <input id="quickModalIsManager" type="checkbox" class="rounded text-blue-600 w-4 h-4" />
+          <span class="text-xs font-medium text-slate-700">이 인원을 데이터 열람 관리자로 지정</span>
+        </label>
+      </div>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button id="btnCancelQuickAdd" onclick="closeAddMemberModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold">취소</button>
+        <button id="btnConfirmQuickAdd" onclick="submitQuickModalMember()" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold">등록 완료</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Role Switch & Designated Manager Verification Modal -->
+  <div id="modalRoleSwitch" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl animate-slide-up space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="font-bold text-base text-slate-900">접속자 권한 전환 (설계사 ↔ 지정 관리자)</h3>
+          <p class="text-xs text-slate-500 mt-0.5">지정된 관리자만 주간·월간 출결 데이터를 열람할 수 있습니다.</p>
+        </div>
+        <button id="btnCloseRoleModal" onclick="closeRoleModal()" class="text-slate-400 hover:text-slate-600 text-sm px-2 py-1">✕</button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5">1. 지정 관리자로 로그인 (주간·월간 전체/지사 열람)</label>
+          <select id="roleSelectManager" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm bg-slate-50 font-medium"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">관리자 확인 PIN 번호 (기본값: 0000)</label>
+          <input id="rolePinVerifyInput" type="password" value="0000" placeholder="PIN 4자리 입력" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono" />
+        </div>
+        <button id="btnApplyManagerRole" onclick="applyManagerRole()" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-sm transition">
+          선택한 지정 관리자로 전환
+        </button>
+
+        <div class="border-t border-slate-200 pt-3 mt-3">
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5">2. 일반 설계사 모드로 전환 (당일 출결 체크 전용)</label>
+          <p class="text-[11px] text-slate-500 mb-2">일반 설계사 모드에서는 본인 출결 체크만 가능하며, 주간·월간 집계 탭 접근 시 관리자 인증을 요청합니다.</p>
+          <button id="btnApplyPlannerRole" onclick="applyGeneralPlannerMode()" class="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition">
+            일반 설계사 모드로 보기
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Cloud / Multi-Phone Sync Modal -->
+  <div id="modalCloudSync" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-xl animate-slide-up space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="font-bold text-base text-slate-900">📱 핸드폰 실시간 연동 및 구글 시트 연결</h3>
+          <p class="text-xs text-slate-500 mt-0.5">여러 대의 스마트폰과 PC에서 출결 데이터를 실시간 공유합니다.</p>
+        </div>
+        <button id="btnCloseSyncModal" onclick="closeSyncModal()" class="text-slate-400 hover:text-slate-600 text-sm px-2 py-1">✕</button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div class="p-3.5 rounded-xl bg-blue-50 border border-blue-200 space-y-2">
+          <div class="font-bold text-blue-950 flex items-center justify-between">
+            <span>🔗 구글 스프레드시트 실시간 서버 연동 (Apps Script URL)</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-blue-600 text-white">무료 · 무제한</span>
+          </div>
+          <p class="text-blue-900 leading-relaxed">
+            기존에 사용하시는 <strong>새길지사_도입DB</strong>처럼 구글 시트 웹앱 URL을 아래에 입력하면, 설계사들이 각자 핸드폰에서 출근 체크할 때 대표님·지점장님 폰과 구글 시트에 실시간으로 동기화됩니다.
+          </p>
+          <input id="syncWebhookUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2 rounded-lg border border-blue-300 bg-white text-slate-800 text-xs focus:outline-none" />
+          <div class="flex items-center gap-2 pt-1">
+            <button id="btnSaveWebhookUrl" onclick="saveWebhookUrl()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold">연동 주소 저장</button>
+            <button id="btnCopyAppsScriptCode" onclick="copyAppsScriptTemplate()" class="px-3 py-1.5 rounded-lg bg-white hover:bg-blue-100 text-blue-700 border border-blue-300 font-semibold">구글시트 연동용 스크립트 복사</button>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+          <div class="font-bold text-slate-900">📲 파일로 다른 핸드폰/PC에 즉시 내보내기 · 불러오기</div>
+          <p class="text-slate-600">현재 등록된 설계사 명단과 전체 출결 기록(JSON)을 카톡이나 파일로 주고받아 그대로 복원할 수 있습니다.</p>
+          <div class="flex flex-wrap items-center gap-2 pt-1">
+            <button id="btnExportJsonBackup" onclick="exportJsonBackup()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold">데이터 백업 파일 저장(.json)</button>
+            <label class="px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold cursor-pointer">
+              <span>백업 파일 불러오기</span>
+              <input id="importJsonInput" type="file" accept=".json" onchange="importJsonBackup(event)" class="hidden" />
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Individual Planner Monthly Detail Modal -->
+  <div id="modalMemberDetail" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-xl animate-slide-up space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h3 id="detailModalNameTitle" class="font-bold text-base text-slate-900">설계사 월간 상세 출결표</h3>
+          <p id="detailModalSubTitle" class="text-xs text-slate-500 mt-0.5">2026년 11월 일자별 출결 기록</p>
+        </div>
+        <button id="btnCloseDetailModal" onclick="closeMemberDetailModal()" class="text-slate-400 hover:text-slate-600 text-sm px-2 py-1">✕</button>
+      </div>
+      <div id="detailModalSummaryRow" class="grid grid-cols-5 gap-2 text-center text-xs"></div>
+      <div id="detailModalCalendarGrid" class="grid grid-cols-7 gap-1.5 text-center text-xs"></div>
+    </div>
+  </div>
+
+  <!-- 5. Confirm Action Modal -->
+  <div id="modalConfirmAction" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl animate-slide-up space-y-4">
+      <h3 id="confirmModalTitle" class="font-bold text-base text-slate-900">확인</h3>
+      <p id="confirmModalMessage" class="text-xs text-slate-600 leading-relaxed"></p>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button id="btnCancelConfirmModal" onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold">취소</button>
+        <button id="btnExecuteConfirmModal" onclick="executeConfirmCallback()" class="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold">확인 실행</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastContainer" class="fixed bottom-20 md:bottom-6 right-4 z-50 pointer-events-none flex flex-col gap-2"></div>
+
+  <script>
+    // =========================================================================
+    // 1. INITIAL DEMO DATA & DEFAULT BRANCHES (대전, 청주, 천안, 충주 + 추가 가능)
+    // =========================================================================
+    const STORAGE_KEY = 'saegil_ga_attendance_v2';
+    const TODAY_STR = '2026-11-06';
+    const DEFAULT_BRANCHES = ['대전지사', '청주지사', '천안지사', '충주지사'];
+
+    const DEFAULT_MEMBERS = [
+      // 대전지사 (12명)
+      { id: 'm1', name: '김종욱', branch: '대전지사', roleTitle: '대표', phone: '010-8626-9280', isManager: true, scope: '전체지사' },
+      { id: 'm2', name: '김동부', branch: '대전지사', roleTitle: '지점장', phone: '010-3421-8890', isManager: true, scope: '대전지사' },
+      { id: 'm3', name: '김글로', branch: '대전지사', roleTitle: '팀장', phone: '010-1234-5678', isManager: true, scope: '대전지사' },
+      { id: 'm4', name: '박성훈', branch: '대전지사', roleTitle: '설계사', phone: '010-5821-3341', isManager: false, scope: '본인' },
+      { id: 'm5', name: '이정민', branch: '대전지사', roleTitle: '설계사', phone: '010-6392-1120', isManager: false, scope: '본인' },
+      { id: 'm6', name: '최수진', branch: '대전지사', roleTitle: '설계사', phone: '010-4418-9021', isManager: false, scope: '본인' },
+      { id: 'm7', name: '정현우', branch: '대전지사', roleTitle: '설계사', phone: '010-7712-4500', isManager: false, scope: '본인' },
+      { id: 'm8', name: '강지영', branch: '대전지사', roleTitle: '설계사', phone: '010-2910-6612', isManager: false, scope: '본인' },
+      { id: 'm9', name: '조민석', branch: '대전지사', roleTitle: '설계사', phone: '010-8311-2094', isManager: false, scope: '본인' },
+      { id: 'm10', name: '윤서연', branch: '대전지사', roleTitle: '설계사', phone: '010-9043-1182', isManager: false, scope: '본인' },
+      { id: 'm11', name: '장도윤', branch: '대전지사', roleTitle: '설계사', phone: '010-5190-7723', isManager: false, scope: '본인' },
+      { id: 'm12', name: '한소희', branch: '대전지사', roleTitle: '총무/스탭', phone: '010-3389-0192', isManager: true, scope: '전체지사' },
+
+      // 청주지사 (7명)
+      { id: 'm13', name: '오태양', branch: '청주지사', roleTitle: '지점장', phone: '010-4122-5501', isManager: true, scope: '청주지사' },
+      { id: 'm14', name: '신유나', branch: '청주지사', roleTitle: '팀장', phone: '010-6671-8910', isManager: false, scope: '본인' },
+      { id: 'm15', name: '임재현', branch: '청주지사', roleTitle: '설계사', phone: '010-2849-3310', isManager: false, scope: '본인' },
+      { id: 'm16', name: '송하은', branch: '청주지사', roleTitle: '설계사', phone: '010-9912-4012', isManager: false, scope: '본인' },
+      { id: 'm17', name: '백승호', branch: '청주지사', roleTitle: '설계사', phone: '010-7381-2290', isManager: false, scope: '본인' },
+      { id: 'm18', name: '류지민', branch: '청주지사', roleTitle: '설계사', phone: '010-5501-8832', isManager: false, scope: '본인' },
+      { id: 'm19', name: '권혁진', branch: '청주지사', roleTitle: '설계사', phone: '010-3192-7410', isManager: false, scope: '본인' },
+
+      // 천안지사 (6명)
+      { id: 'm25', name: '배성우', branch: '천안지사', roleTitle: '지점장', phone: '010-9301-1128', isManager: true, scope: '천안지사' },
+      { id: 'm26', name: '나영석', branch: '천안지사', roleTitle: '팀장', phone: '010-4810-2239', isManager: false, scope: '본인' },
+      { id: 'm27', name: '김태리', branch: '천안지사', roleTitle: '설계사', phone: '010-5112-8874', isManager: false, scope: '본인' },
+      { id: 'm28', name: '손석구', branch: '천안지사', roleTitle: '설계사', phone: '010-3901-6651', isManager: false, scope: '본인' },
+      { id: 'm29', name: '박은빈', branch: '천안지사', roleTitle: '설계사', phone: '010-7219-3309', isManager: false, scope: '본인' },
+      { id: 'm30', name: '이동욱', branch: '천안지사', roleTitle: '설계사', phone: '010-6509-7120', isManager: false, scope: '본인' },
+
+      // 충주지사 (5명)
+      { id: 'm20', name: '황보람', branch: '충주지사', roleTitle: '지점장', phone: '010-8122-9901', isManager: true, scope: '충주지사' },
+      { id: 'm21', name: '안재욱', branch: '충주지사', roleTitle: '설계사', phone: '010-2091-4481', isManager: false, scope: '본인' },
+      { id: 'm22', name: '전미선', branch: '충주지사', roleTitle: '설계사', phone: '010-6421-3390', isManager: false, scope: '본인' },
+      { id: 'm23', name: '고경표', branch: '충주지사', roleTitle: '설계사', phone: '010-7740-1920', isManager: false, scope: '본인' },
+      { id: 'm24', name: '문채원', branch: '충주지사', roleTitle: '설계사', phone: '010-8910-5543', isManager: false, scope: '본인' }
+    ];
+
+    function buildInitialAttendance(members) {
+      const records = {};
+      const start = new Date('2026-10-01T00:00:00');
+      const end = new Date('2026-11-06T00:00:00');
+      const memos = [
+        '차집사 자동차DB 상담',
+        '병원 인하우스 청구 상담',
+        '신계약 가망고객 방문',
+        '오전 지사 조회 참석',
+        '펫보험 제휴점 미팅',
+        '보장분석 리모델링 미팅'
+      ];
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dayOfWeek = d.getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+        const ds = formatDateStr(d);
+        records[ds] = {};
+
+        members.forEach((m, idx) => {
+          const seed = (d.getDate() * 17 + (idx + 1) * 31) % 100;
+          if (dayOfWeek === 6) {
+            if (seed < 20) {
+              records[ds][m.id] = { status: '출근', time: '09:10', note: '주말 당직/DB정리' };
+            } else if (seed < 38) {
+              records[ds][m.id] = { status: '외근', time: '10:00', note: '주말 고객 미팅' };
+            }
+            return;
+          }
+
+          if (m.roleTitle === '대표' || m.roleTitle === '지점장' || m.roleTitle === '총무/스탭') {
+            records[ds][m.id] = {
+              status: seed < 82 ? '출근' : '외근',
+              time: '08:35',
+              note: seed < 82 ? '지사 운영 및 조회' : '지사 순회 미팅'
+            };
+          } else if (seed < 65) {
+            const min = 30 + (seed % 28);
+            records[ds][m.id] = { status: '출근', time: `08:${String(min).padStart(2, '0')}`, note: idx % 4 === 0 ? memos[idx % memos.length] : '' };
+          } else if (seed < 85) {
+            records[ds][m.id] = { status: '외근', time: '09:00', note: memos[(idx + d.getDate()) % memos.length] };
+          } else if (seed < 92) {
+            records[ds][m.id] = { status: '지각', time: '09:24', note: '차량 정체' };
+          } else if (seed < 96) {
+            records[ds][m.id] = { status: '휴가', time: '-', note: '개인 연차/반차' };
+          } else {
+            records[ds][m.id] = { status: '결근', time: '-', note: '미출근' };
+          }
+        });
+      }
+      return records;
+    }
+
+    // =========================================================================
+    // 2. APPLICATION STATE
+    // =========================================================================
+    let state = {
+      activeTab: 'matrix', // Default to the Row-Column Matrix Sheet requested by user
+      selectedDate: TODAY_STR,
+      selectedMonth: '2026-11',
+      branchFilter: '전체',
+      statusFilter: '전체',
+      branches: [...DEFAULT_BRANCHES],
+      matrixOrientation: 'planners_as_rows', // 'planners_as_rows' (행:설계사/우측끝:설계사월출근율, 열:날짜/하단끝:일별출근합산) or 'dates_as_rows' (행:날짜, 열:설계사)
+      matrixDenomMode: 'month_weekdays', // 'month_weekdays', 'elapsed_weekdays', 'month_all_days', 'custom'
+      matrixCustomDenom: 21,
+      matrixClickMode: 'quick_ox', // 'quick_ox' or 'cycle_all'
+      adminPin: '0000',
+      webhookUrl: '',
+      currentUser: {
+        isManagerMode: true,
+        managerId: 'm1',
+        name: '김종욱',
+        roleTitle: '대표',
+        scope: '전체지사'
+      },
+      members: [],
+      attendance: {}
+    };
+
+    let pendingConfirmCallback = null;
+    let deletedMemberHistory = [];
+    let deletedBranchHistory = [];
+    let weeklyTrendChartInstance = null;
+    let weeklyBranchChartInstance = null;
+    let monthlyDailyRateChartInstance = null;
+    let monthlyTypeDoughnutChartInstance = null;
+
+    // =========================================================================
+    // 3. HELPER & STORAGE FUNCTIONS
+    // =========================================================================
+    function formatDateStr(dateObj) {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const d = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function getKoreanDayName(dateStr) {
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      const d = new Date(dateStr + 'T00:00:00');
+      return days[d.getDay()];
+    }
+
+    function formatShortBranchName(branchName) {
+      return branchName.replace(/지사$/, '');
+    }
+
+    function isAttendedStatus(status) {
+      return status === '출근' || status === '외근' || status === '지각';
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.members)) {
+            state.members = parsed.members;
+            state.attendance = parsed.attendance || {};
+            state.branches = Array.isArray(parsed.branches) && parsed.branches.length >= 1
+              ? parsed.branches
+              : [...DEFAULT_BRANCHES];
+            state.adminPin = parsed.adminPin || '0000';
+            state.webhookUrl = parsed.webhookUrl || '';
+            state.matrixOrientation = parsed.matrixOrientation || 'planners_as_rows';
+            state.matrixDenomMode = parsed.matrixDenomMode || 'month_weekdays';
+            state.matrixCustomDenom = parsed.matrixCustomDenom || 21;
+            state.matrixClickMode = parsed.matrixClickMode || 'quick_ox';
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('localStorage load skipped:', e);
+      }
+      state.branches = [...DEFAULT_BRANCHES];
+      state.members = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+      state.attendance = buildInitialAttendance(state.members);
+      saveState();
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          branches: state.branches,
+          members: state.members,
+          attendance: state.attendance,
+          adminPin: state.adminPin,
+          webhookUrl: state.webhookUrl,
+          matrixOrientation: state.matrixOrientation,
+          matrixDenomMode: state.matrixDenomMode,
+          matrixCustomDenom: state.matrixCustomDenom,
+          matrixClickMode: state.matrixClickMode
+        }));
+      } catch (e) {
+        console.warn('localStorage save skipped:', e);
+      }
+      const badge = document.getElementById('syncStatusBadge');
+      if (badge) {
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>자동저장됨';
+      }
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const el = document.createElement('div');
+      const bg = type === 'error' ? 'bg-rose-600' : type === 'info' ? 'bg-slate-800' : 'bg-emerald-600';
+      el.className = `${bg} text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 animate-slide-up`;
+      el.textContent = message;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.remove();
+      }, 2500);
+    }
+
+    function copyTextToClipboard(text, successMsg) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(successMsg);
+        }).catch(() => {
+          fallbackCopy(text, successMsg);
+        });
+      } else {
+        fallbackCopy(text, successMsg);
+      }
+    }
+
+    function fallbackCopy(text, successMsg) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast(successMsg);
+      } catch (e) {
+        showToast('복사에 실패했습니다.', 'error');
+      }
+      document.body.removeChild(ta);
+    }
+
+    // =========================================================================
+    // 4. NAVIGATION, BRANCH MANAGEMENT & FILTERS
+    // =========================================================================
+    function switchTab(tabName) {
+      if ((tabName === 'weekly' || tabName === 'monthly' || tabName === 'members') && !state.currentUser.isManagerMode) {
+        showToast('지정 관리자만 열람할 수 있는 메뉴입니다. 관리자 전환 후 확인하세요.', 'error');
+        openRoleModal();
+        return;
+      }
+
+      state.activeTab = tabName;
+      const views = {
+        matrix: document.getElementById('viewMatrix'),
+        checkin: document.getElementById('viewCheckin'),
+        weekly: document.getElementById('viewWeekly'),
+        monthly: document.getElementById('viewMonthly'),
+        members: document.getElementById('viewMembers')
+      };
+      Object.keys(views).forEach(k => {
+        if (views[k]) {
+          views[k].classList.toggle('hidden', k !== tabName);
+        }
+      });
+
+      const deskMap = {
+        matrix: 'deskTabMatrix',
+        checkin: 'deskTabCheckin',
+        weekly: 'deskTabWeekly',
+        monthly: 'deskTabMonthly',
+        members: 'deskTabMembers'
+      };
+      Object.keys(deskMap).forEach(k => {
+        const btn = document.getElementById(deskMap[k]);
+        if (!btn) return;
+        if (k === tabName) {
+          btn.className = 'tab-nav-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-blue-400 text-white flex items-center gap-2';
+        } else {
+          btn.className = 'tab-nav-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white flex items-center gap-2';
+        }
+      });
+
+      const mobMap = {
+        matrix: 'mobTabMatrix',
+        checkin: 'mobTabCheckin',
+        weekly: 'mobTabWeekly',
+        monthly: 'mobTabMonthly',
+        members: 'mobTabMembers'
+      };
+      Object.keys(mobMap).forEach(k => {
+        const btn = document.getElementById(mobMap[k]);
+        if (!btn) return;
+        if (k === tabName) {
+          btn.className = 'mob-nav-btn flex flex-col items-center justify-center gap-1 text-blue-600 font-bold bg-blue-50/50';
+        } else {
+          btn.className = 'mob-nav-btn flex flex-col items-center justify-center gap-1 text-slate-500 font-medium';
+        }
+      });
+
+      renderAll();
+    }
+
+    function setBranchFilter(branch) {
+      state.branchFilter = branch;
+      const inlineSel = document.getElementById('inlineAddBranchSelect');
+      if (inlineSel && branch !== '전체') {
+        inlineSel.value = branch;
+      }
+      renderAll();
+    }
+
+    function openBranchManageModal() {
+      renderBranchManageList();
+      document.getElementById('modalBranchManage')?.classList.remove('hidden');
+    }
+
+    function closeBranchManageModal() {
+      document.getElementById('modalBranchManage')?.classList.add('hidden');
+    }
+
+    function addCustomBranch() {
+      const input = document.getElementById('newBranchNameInput');
+      let name = (input?.value || '').trim();
+      if (!name) {
+        showToast('추가할 지사/구분 이름을 입력해 주세요.', 'error');
+        return;
+      }
+      if (name === '전체') {
+        showToast('"전체"는 기본 통합 탭 이름입니다.', 'error');
+        return;
+      }
+      if (state.branches.includes(name)) {
+        showToast('이미 등록된 구분 이름입니다.', 'error');
+        return;
+      }
+      state.branches.push(name);
+      if (input) input.value = '';
+      saveState();
+      renderBranchManageList();
+      renderAll();
+      showToast(`[${name}] 구분이 추가되었습니다!`);
+    }
+
+    function setBranchFilterByIndex(idx) {
+      const target = state.branches[idx];
+      if (!target) return;
+      setBranchFilter(target);
+    }
+
+    function renameBranchByIndex(idx, rawNewName) {
+      const oldName = state.branches[idx];
+      if (!oldName) return;
+      const newName = (rawNewName || '').trim();
+      if (!newName) {
+        showToast('변경할 구분 이름을 입력해 주세요.', 'error');
+        renderBranchManageList();
+        return;
+      }
+      if (newName === '전체') {
+        showToast('"전체"는 통합 탭 이름이므로 사용할 수 없습니다.', 'error');
+        renderBranchManageList();
+        return;
+      }
+      if (newName === oldName) {
+        showToast('기존 구분 이름과 동일합니다.', 'info');
+        return;
+      }
+      if (state.branches.some((b, i) => i !== idx && b === newName)) {
+        showToast('이미 존재하는 구분 이름입니다.', 'error');
+        renderBranchManageList();
+        return;
+      }
+
+      state.branches[idx] = newName;
+      state.members.forEach(m => {
+        if (m.branch === oldName) m.branch = newName;
+        if (m.scope === oldName) m.scope = newName;
+      });
+      if (state.branchFilter === oldName) {
+        state.branchFilter = newName;
+      }
+
+      saveState();
+      renderBranchManageList();
+      renderAll();
+      showToast(`지사 구분 이름이 [${oldName}] → [${newName}](으)로 변경되었습니다!`);
+    }
+
+    function renameBranchFromButton(idx) {
+      const inputEl = document.getElementById('branchRenameInput_' + idx);
+      if (!inputEl) return;
+      renameBranchByIndex(idx, inputEl.value);
+    }
+
+    function removeBranchByIndex(idx) {
+      const branchName = state.branches[idx];
+      if (!branchName) return;
+      removeCustomBranch(branchName);
+    }
+
+    function removeCustomBranch(branchName) {
+      if (state.branches.length <= 1) {
+        showToast('최소 1개 이상의 지사 구분이 남아 있어야 합니다.', 'error');
+        return;
+      }
+      const idx = state.branches.indexOf(branchName);
+      if (idx === -1) return;
+
+      const mode = document.getElementById('branchDeleteMemberMode')?.value || 'delete_members';
+      const remainingBranches = state.branches.filter(b => b !== branchName);
+      const fallbackBranch = remainingBranches[0];
+      const affectedMembers = state.members
+        .filter(m => m.branch === branchName)
+        .map(m => JSON.parse(JSON.stringify(m)));
+
+      deletedBranchHistory.push({
+        branchName,
+        index: idx,
+        mode,
+        membersSnapshot: JSON.parse(JSON.stringify(state.members))
+      });
+
+      state.branches.splice(idx, 1);
+      if (mode === 'move_members') {
+        state.members.forEach(m => {
+          if (m.branch === branchName) m.branch = fallbackBranch;
+          if (m.scope === branchName) m.scope = fallbackBranch;
+        });
+      } else {
+        state.members = state.members.filter(m => m.branch !== branchName);
+      }
+
+      if (state.branchFilter === branchName) {
+        state.branchFilter = '전체';
+      }
+
+      saveState();
+      renderBranchManageList();
+      renderAll();
+
+      const undoBtn = document.getElementById('btnUndoBranchDelete');
+      if (undoBtn) {
+        undoBtn.classList.remove('hidden');
+        undoBtn.textContent = `↩ '${formatShortBranchName(branchName)}' 복구`;
+      }
+
+      if (affectedMembers.length > 0 && mode === 'move_members') {
+        showToast(`[${branchName}] 구분이 삭제되고 소속 ${affectedMembers.length}명이 [${fallbackBranch}]로 이동되었습니다.`);
+      } else {
+        showToast(`[${branchName}] 구분이 삭제되었습니다. (복구 버튼으로 되돌리기 가능)`, 'info');
+      }
+    }
+
+    function undoLastDeletedBranch() {
+      if (!deletedBranchHistory.length) return;
+      const last = deletedBranchHistory.pop();
+      const insertIdx = Math.min(last.index, state.branches.length);
+      if (!state.branches.includes(last.branchName)) {
+        state.branches.splice(insertIdx, 0, last.branchName);
+      }
+      state.members = last.membersSnapshot;
+      saveState();
+      renderBranchManageList();
+      renderAll();
+
+      const undoBtn = document.getElementById('btnUndoBranchDelete');
+      if (undoBtn) {
+        if (deletedBranchHistory.length > 0) {
+          const prevB = deletedBranchHistory[deletedBranchHistory.length - 1].branchName;
+          undoBtn.textContent = `↩ '${formatShortBranchName(prevB)}' 복구`;
+        } else {
+          undoBtn.classList.add('hidden');
+        }
+      }
+      showToast(`[${last.branchName}] 구분과 소속 명단이 복구되었습니다!`);
+    }
+
+    function renderBranchManageList() {
+      const container = document.getElementById('branchManageListContainer');
+      if (!container) return;
+      container.innerHTML = state.branches.map((b, idx) => {
+        const count = state.members.filter(m => m.branch === b).length;
+        const safeVal = b.replace(/"/g, '&quot;');
+        return `
+          <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+            <div class="flex items-center gap-1.5 flex-1 min-w-0">
+              <span class="text-[10px] font-mono text-slate-400 w-4 shrink-0">${idx + 1}</span>
+              <input id="branchRenameInput_${idx}" type="text" value="${safeVal}"
+                onkeydown="if(event.key==='Enter'){renameBranchByIndex(${idx}, this.value);}"
+                onchange="renameBranchByIndex(${idx}, this.value)"
+                class="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white font-bold text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold shrink-0">${count}명</span>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button type="button" onclick="renameBranchFromButton(${idx})"
+                class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-[11px] transition">
+                이름변경
+              </button>
+              <button type="button" onclick="removeBranchByIndex(${idx})"
+                class="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 font-bold text-[11px] transition">
+                삭제
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function populateBranchSelectDropdowns() {
+      const selectIds = ['inlineAddBranchSelect', 'newMemberBranch', 'bulkDefaultBranch', 'quickModalBranchSelect'];
+      selectIds.forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        const prev = sel.value;
+        sel.innerHTML = state.branches.map(b =>
+          `<option value="${b}">${formatShortBranchName(b)} (${b})</option>`
+        ).join('');
+        if (prev && state.branches.includes(prev)) {
+          sel.value = prev;
+        } else if (state.branchFilter !== '전체' && state.branches.includes(state.branchFilter)) {
+          sel.value = state.branchFilter;
+        }
+      });
+    }
+
+    function addInlineMembersFromBar() {
+      const nameInput = document.getElementById('inlineAddNamesInput');
+      const branchSel = document.getElementById('inlineAddBranchSelect');
+      const raw = (nameInput?.value || '').trim();
+      if (!raw) {
+        showToast('추가할 설계사 이름을 입력해 주세요.', 'error');
+        return;
+      }
+      const targetBranch = branchSel?.value || (state.branchFilter !== '전체' ? state.branchFilter : '대전지사');
+      const names = raw.split(',').map(s => s.trim()).filter(Boolean);
+      names.forEach((n, idx) => {
+        state.members.push({
+          id: 'm_' + Date.now() + '_' + idx + '_' + Math.floor(Math.random() * 1000),
+          name: n,
+          branch: targetBranch,
+          roleTitle: '설계사',
+          phone: '',
+          isManager: false,
+          scope: '본인'
+        });
+      });
+      if (nameInput) nameInput.value = '';
+      saveState();
+      renderAll();
+      showToast(`[${formatShortBranchName(targetBranch)}] 구분에 설계사 ${names.length}명이 추가되었습니다!`);
+    }
+
+    function setStatusFilter(status) {
+      state.statusFilter = status;
+      const map = {
+        '전체': 'statusFilterAll',
+        '미체크': 'statusFilterUnchecked',
+        '출근': 'statusFilterPresent',
+        '외근': 'statusFilterField',
+        '지각': 'statusFilterLate',
+        '휴가': 'statusFilterLeave',
+        '결근': 'statusFilterAbsent'
+      };
+      Object.keys(map).forEach(k => {
+        const el = document.getElementById(map[k]);
+        if (!el) return;
+        if (k === status) {
+          el.className = 'status-filter-pill px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white shrink-0 shadow-xs';
+        } else {
+          el.className = 'status-filter-pill px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0';
+        }
+      });
+      renderDailyCheckinList();
+    }
+
+    function clearPlannerSearch() {
+      const input = document.getElementById('searchPlannerInput');
+      if (input) input.value = '';
+      renderDailyCheckinList();
+    }
+
+    function onDateInputChange(val) {
+      if (!val) return;
+      state.selectedDate = val;
+      state.selectedMonth = val.slice(0, 7);
+      const ms = document.getElementById('monthSelector');
+      if (ms) ms.value = state.selectedMonth;
+      const mms = document.getElementById('matrixMonthSelect');
+      if (mms) mms.value = state.selectedMonth;
+      renderAll();
+    }
+
+    function changeDateBy(days) {
+      const d = new Date(state.selectedDate + 'T00:00:00');
+      d.setDate(d.getDate() + days);
+      onDateInputChange(formatDateStr(d));
+    }
+
+    function changeWeekBy(weeks) {
+      changeDateBy(weeks * 7);
+    }
+
+    function setToday() {
+      onDateInputChange(TODAY_STR);
+      showToast(`오늘 날짜(${TODAY_STR})로 이동했습니다.`, 'info');
+    }
+
+    function populateMonthSelectors() {
+      const nowYear = Math.max(2026, new Date().getFullYear());
+      const selYear = parseInt((state.selectedMonth || '2026-11').slice(0, 4), 10) || 2026;
+      const startYear = Math.min(2025, selYear - 1);
+      const endYear = Math.max(nowYear + 3, selYear + 2);
+
+      const optionsHtml = [];
+      for (let y = startYear; y <= endYear; y++) {
+        for (let m = 1; m <= 12; m++) {
+          const val = `${y}-${String(m).padStart(2, '0')}`;
+          const tag = val === TODAY_STR.slice(0, 7) ? ' (현재월)' : '';
+          optionsHtml.push(`<option value="${val}">${y}년 ${m}월${tag}</option>`);
+        }
+      }
+      const htmlStr = optionsHtml.join('');
+
+      ['matrixMonthSelect', 'monthSelector'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = htmlStr;
+        el.value = state.selectedMonth;
+      });
+    }
+
+    function changeMonthBy(deltaMonths) {
+      const [y, m] = (state.selectedMonth || '2026-11').split('-').map(Number);
+      const d = new Date(y, m - 1 + deltaMonths, 1);
+      const nextMonthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      onMatrixMonthChange(nextMonthStr);
+    }
+
+    function onMonthSelectChange(monthStr) {
+      state.selectedMonth = monthStr;
+      if (!state.selectedDate.startsWith(monthStr)) {
+        state.selectedDate = monthStr === TODAY_STR.slice(0, 7) ? TODAY_STR : `${monthStr}-01`;
+      }
+      renderAll();
+    }
+
+    function onMatrixMonthChange(monthStr) {
+      state.selectedMonth = monthStr;
+      if (!state.selectedDate.startsWith(monthStr)) {
+        state.selectedDate = monthStr === TODAY_STR.slice(0, 7) ? TODAY_STR : `${monthStr}-01`;
+      }
+      renderAll();
+    }
+
+    function onMatrixDenomModeChange(mode) {
+      state.matrixDenomMode = mode;
+      const customInput = document.getElementById('matrixCustomDenomInput');
+      if (customInput) {
+        customInput.classList.toggle('hidden', mode !== 'custom');
+      }
+      saveState();
+      renderMatrixView();
+    }
+
+    function onCustomDenomChange(val) {
+      const num = Math.max(1, Math.min(31, parseInt(val, 10) || 21));
+      state.matrixCustomDenom = num;
+      saveState();
+      renderMatrixView();
+    }
+
+    function onMatrixClickModeChange(mode) {
+      state.matrixClickMode = mode;
+      saveState();
+      showToast(mode === 'quick_ox' ? '원터치 출근(O/X) 모드로 설정되었습니다.' : '상세 상태 순환 모드로 설정되었습니다.', 'info');
+    }
+
+    function toggleMatrixOrientation() {
+      state.matrixOrientation = state.matrixOrientation === 'planners_as_rows' ? 'dates_as_rows' : 'planners_as_rows';
+      saveState();
+      renderMatrixView();
+      const label = state.matrixOrientation === 'planners_as_rows'
+        ? '날짜 가로형 (행=설계사 / 열=날짜)'
+        : '날짜 세로형 (행=해당월·날짜 / 열=설계사 이름)';
+      showToast(`표시 방향이 [${label}]으로 전환되었습니다.`);
+    }
+
+    // =========================================================================
+    // 5. CORE ATTENDANCE CHECK-IN & MATRIX ACTIONS
+    // =========================================================================
+    function getFilteredMembersForBranch() {
+      return state.members.filter(m => {
+        if (state.branchFilter !== '전체' && m.branch !== state.branchFilter) return false;
+        return true;
+      });
+    }
+
+    function getMemberDayRecord(dateStr, memberId) {
+      if (!state.attendance[dateStr] || !state.attendance[dateStr][memberId]) {
+        return { status: '미체크', time: '-', note: '' };
+      }
+      return state.attendance[dateStr][memberId];
+    }
+
+    function setMemberAttendance(memberId, newStatus, dateStr = state.selectedDate) {
+      if (!state.attendance[dateStr]) {
+        state.attendance[dateStr] = {};
+      }
+      const prev = state.attendance[dateStr][memberId] || { status: '미체크', time: '-', note: '' };
+      const now = new Date();
+      const timeStr = (newStatus === '출근' || newStatus === '외근' || newStatus === '지각')
+        ? `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+        : '-';
+
+      state.attendance[dateStr][memberId] = {
+        status: newStatus,
+        time: prev.time !== '-' && prev.status === newStatus ? prev.time : timeStr,
+        note: prev.note || ''
+      };
+
+      saveState();
+      renderAll();
+    }
+
+    function handleMatrixCellClick(memberId, dateStr) {
+      const cur = getMemberDayRecord(dateStr, memberId).status;
+      if (state.matrixClickMode === 'quick_ox') {
+        const next = isAttendedStatus(cur) ? '미체크' : '출근';
+        setMemberAttendance(memberId, next, dateStr);
+      } else {
+        const order = ['출근', '외근', '지각', '휴가', '결근', '미체크'];
+        const next = order[(order.indexOf(cur) + 1) % order.length];
+        setMemberAttendance(memberId, next, dateStr);
+      }
+    }
+
+    function markAllPresentForDate(dateStr) {
+      if (!state.attendance[dateStr]) state.attendance[dateStr] = {};
+      const list = getFilteredMembersForBranch();
+      const allAlreadyPresent = list.every(m => isAttendedStatus(getMemberDayRecord(dateStr, m.id).status));
+      list.forEach(m => {
+        state.attendance[dateStr][m.id] = {
+          status: allAlreadyPresent ? '미체크' : '출근',
+          time: allAlreadyPresent ? '-' : '08:50',
+          note: state.attendance[dateStr][m.id]?.note || ''
+        };
+      });
+      saveState();
+      renderAll();
+      showToast(allAlreadyPresent
+        ? `${dateStr.slice(5)} 전체 출결 체크를 해제했습니다.`
+        : `${dateStr.slice(5)} 대상 ${list.length}명 전원 출근 처리했습니다.`);
+    }
+
+    function markAllPresentForSelectedDate() {
+      markAllPresentForDate(state.selectedDate);
+    }
+
+    function updateMemberNameInline(memberId, newName) {
+      const trimmed = (newName || '').trim();
+      const m = state.members.find(x => x.id === memberId);
+      if (!m) return;
+      if (!trimmed) {
+        quickDeleteMember(memberId);
+        return;
+      }
+      m.name = trimmed;
+      saveState();
+      renderAll();
+      showToast(`설계사 이름이 [${trimmed}](으)로 수정되었습니다.`);
+    }
+
+    function quickDeleteMember(memberId) {
+      const idx = state.members.findIndex(x => x.id === memberId);
+      if (idx === -1) return;
+      const removed = state.members[idx];
+      deletedMemberHistory.push({ member: JSON.parse(JSON.stringify(removed)), index: idx });
+      state.members.splice(idx, 1);
+      saveState();
+      renderAll();
+      const undoBtn = document.getElementById('btnUndoDeleteMember');
+      if (undoBtn) {
+        undoBtn.classList.remove('hidden');
+        undoBtn.textContent = `↩ '${removed.name}' 삭제 복구`;
+      }
+      showToast(`[${removed.name} (${formatShortBranchName(removed.branch)})] 설계사가 삭제되었습니다. 상단 '삭제 복구'로 되돌릴 수 있습니다.`, 'info');
+    }
+
+    function undoLastDeletedMember() {
+      if (!deletedMemberHistory.length) {
+        showToast('복구할 삭제 내역이 없습니다.', 'info');
+        return;
+      }
+      const last = deletedMemberHistory.pop();
+      const insertIdx = Math.min(last.index, state.members.length);
+      state.members.splice(insertIdx, 0, last.member);
+      saveState();
+      renderAll();
+      const undoBtn = document.getElementById('btnUndoDeleteMember');
+      if (undoBtn) {
+        if (deletedMemberHistory.length > 0) {
+          const prevName = deletedMemberHistory[deletedMemberHistory.length - 1].member.name;
+          undoBtn.textContent = `↩ '${prevName}' 삭제 복구`;
+        } else {
+          undoBtn.classList.add('hidden');
+        }
+      }
+      showToast(`[${last.member.name}] 설계사가 다시 복구되었습니다!`);
+    }
+
+    function openClearCurrentBranchModal() {
+      const isAll = state.branchFilter === '전체';
+      const targetLabel = isAll ? '전체 지사' : formatShortBranchName(state.branchFilter);
+      openConfirmModal(
+        `${targetLabel} 명단 비우기`,
+        isAll
+          ? '현재 등록된 전체 설계사 명단을 모두 비우고 새로 입력하시겠습니까?'
+          : `[${targetLabel}] 구분의 설계사 명단을 모두 비우시겠습니까? (다른 지사 명단은 유지됩니다)`,
+        () => {
+          if (isAll) {
+            state.members = [];
+          } else {
+            state.members = state.members.filter(m => m.branch !== state.branchFilter);
+          }
+          saveState();
+          renderAll();
+          showToast(`[${targetLabel}] 명단이 비워졌습니다. 상단 입력창이나 표에서 새 명단을 입력해 주세요.`, 'info');
+        }
+      );
+    }
+
+    function addNewMemberFromMatrixInput(inputEl) {
+      const name = (inputEl?.value || '').trim();
+      if (!name) return;
+      const targetBranch = state.branchFilter !== '전체' ? state.branchFilter : '대전지사';
+      state.members.push({
+        id: 'm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        name,
+        branch: targetBranch,
+        roleTitle: '설계사',
+        phone: '',
+        isManager: false,
+        scope: '본인'
+      });
+      inputEl.value = '';
+      saveState();
+      renderAll();
+      showToast(`[${formatShortBranchName(targetBranch)}] ${name} 설계사가 표에 추가되었습니다.`);
+    }
+
+    function updateMemberNote(memberId, noteText) {
+      const ds = state.selectedDate;
+      if (!state.attendance[ds]) state.attendance[ds] = {};
+      const prev = state.attendance[ds][memberId] || { status: '미체크', time: '-', note: '' };
+      state.attendance[ds][memberId] = {
+        ...prev,
+        note: noteText.trim()
+      };
+      saveState();
+      showToast('특이사항 메모가 저장되었습니다.', 'info');
+    }
+
+    function markAllUncheckedPresent() {
+      const ds = state.selectedDate;
+      if (!state.attendance[ds]) state.attendance[ds] = {};
+      const targetMembers = getFilteredMembersForBranch();
+      let count = 0;
+      targetMembers.forEach(m => {
+        const rec = getMemberDayRecord(ds, m.id);
+        if (rec.status === '미체크') {
+          state.attendance[ds][m.id] = {
+            status: '출근',
+            time: '08:50',
+            note: rec.note || ''
+          };
+          count++;
+        }
+      });
+      saveState();
+      renderAll();
+      if (count > 0) {
+        showToast(`미체크 인원 ${count}명을 전원 [출근] 처리했습니다.`);
+      } else {
+        showToast('미체크 상태인 설계사가 없습니다.', 'info');
+      }
+    }
+
+    function cycleWeeklyCellStatus(memberId, dateStr) {
+      const order = ['출근', '외근', '지각', '휴가', '결근', '미체크'];
+      const cur = getMemberDayRecord(dateStr, memberId).status;
+      const next = order[(order.indexOf(cur) + 1) % order.length];
+      setMemberAttendance(memberId, next, dateStr);
+    }
+
+    // =========================================================================
+    // 6. RENDER FUNCTIONS (INCLUDING THE NEW ROW-COLUMN MATRIX SHEET)
+    // =========================================================================
+    function renderAll() {
+      const dateInput = document.getElementById('selectedDateInput');
+      if (dateInput && dateInput.value !== state.selectedDate) {
+        dateInput.value = state.selectedDate;
+      }
+
+      populateMonthSelectors();
+      populateBranchSelectDropdowns();
+      renderBranchPills();
+      renderKPIs();
+
+      const todayBtn = document.getElementById('btnMatrixTodayAllPresent');
+      if (todayBtn) {
+        todayBtn.textContent = `선택일(${state.selectedDate.slice(5)}) 전원 출근 체크`;
+      }
+
+      if (state.activeTab === 'matrix') {
+        renderMatrixView();
+      } else if (state.activeTab === 'checkin') {
+        renderDailyCheckinList();
+      } else if (state.activeTab === 'weekly') {
+        renderWeeklyView();
+      } else if (state.activeTab === 'monthly') {
+        renderMonthlyView();
+      } else if (state.activeTab === 'members') {
+        renderMembersView();
+      }
+    }
+
+    function renderBranchPills() {
+      const counts = { '전체': state.members.length };
+      state.branches.forEach(b => { counts[b] = 0; });
+      state.members.forEach(m => {
+        counts[m.branch] = (counts[m.branch] || 0) + 1;
+      });
+
+      const allBtn = document.getElementById('branchBtnAll');
+      if (allBtn) {
+        allBtn.textContent = `전체 (${counts['전체'] || 0})`;
+        allBtn.className = state.branchFilter === '전체'
+          ? 'branch-pill px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white shrink-0 shadow-xs transition'
+          : 'branch-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition';
+      }
+
+      ['branchBtnDaejeon', 'branchBtnCheongju', 'branchBtnCheonan', 'branchBtnChungju'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+
+      const customContainer = document.getElementById('customBranchTabsContainer');
+      if (customContainer) {
+        customContainer.innerHTML = state.branches.map((b, idx) => {
+          const isActive = state.branchFilter === b;
+          const cls = isActive
+            ? 'branch-pill px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white shrink-0 shadow-xs transition'
+            : 'branch-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition';
+          return `<button type="button" onclick="setBranchFilterByIndex(${idx})" class="${cls}">${formatShortBranchName(b)} (${counts[b] || 0})</button>`;
+        }).join('');
+      }
+    }
+
+    function getMonthAllDates(monthPrefix) {
+      const [y, m] = monthPrefix.split('-').map(Number);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const dates = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dtStr = `${monthPrefix}-${String(d).padStart(2, '0')}`;
+        const dow = new Date(dtStr + 'T00:00:00').getDay();
+        if (dow === 0 || dow === 6) continue; // 일요일(0), 토요일(6) 제외 (평일 월~금만 표기)
+        dates.push(dtStr);
+      }
+      return dates;
+    }
+
+    function getStandardWorkdaysCount(monthPrefix, allDates) {
+      const weekdays = allDates.filter(dt => {
+        const dow = new Date(dt + 'T00:00:00').getDay();
+        return dow !== 0 && dow !== 6;
+      });
+      const elapsedWeekdays = weekdays.filter(dt => dt <= TODAY_STR);
+
+      const denomSelect = document.getElementById('matrixDenomModeSelect');
+      if (denomSelect) {
+        denomSelect.options[0].textContent = `월 전체 평일수 (${weekdays.length}일·토일제외)`;
+        denomSelect.options[1].textContent = `오늘까지 경과 평일수 (${Math.max(1, elapsedWeekdays.length)}일)`;
+        denomSelect.options[2].textContent = `월 평일 기준 (${allDates.length}일)`;
+      }
+
+      if (state.matrixDenomMode === 'month_weekdays') return Math.max(1, weekdays.length);
+      if (state.matrixDenomMode === 'elapsed_weekdays') return Math.max(1, elapsedWeekdays.length);
+      if (state.matrixDenomMode === 'month_all_days') return Math.max(1, allDates.length);
+      return Math.max(1, state.matrixCustomDenom || weekdays.length);
+    }
+
+    function getMatrixCellShortDisplay(status) {
+      switch (status) {
+        case '출근': return { sym: '✓', cls: 'bg-emerald-500 text-white font-bold border-emerald-600' };
+        case '외근': return { sym: '외', cls: 'bg-blue-500 text-white font-bold border-blue-600' };
+        case '지각': return { sym: '지', cls: 'bg-amber-500 text-white font-bold border-amber-600' };
+        case '휴가': return { sym: '휴', cls: 'bg-purple-500 text-white font-bold border-purple-600' };
+        case '결근': return { sym: 'X', cls: 'bg-rose-500 text-white font-bold border-rose-600' };
+        default: return { sym: '-', cls: 'bg-slate-50 text-slate-300 border-slate-200 hover:bg-slate-100' };
+      }
+    }
+
+    function renderMatrixView() {
+      const monthPrefix = state.selectedMonth;
+      const [y, m] = monthPrefix.split('-').map(Number);
+      const allDates = getMonthAllDates(monthPrefix);
+      const standardDays = getStandardWorkdaysCount(monthPrefix, allDates);
+      const members = getFilteredMembersForBranch();
+      const totalMembersCount = members.length;
+
+      const branchBadge = document.getElementById('matrixCurrentBranchBadge');
+      if (branchBadge) {
+        branchBadge.textContent = state.branchFilter === '전체' ? `전체 (${totalMembersCount}명)` : `${formatShortBranchName(state.branchFilter)} (${totalMembersCount}명)`;
+      }
+      const sheetTitle = document.getElementById('matrixSheetTitle');
+      if (sheetTitle) {
+        sheetTitle.textContent = `${y}년 ${m}월 행·열 출결 현황표 (기준 출근일수: ${standardDays}일)`;
+      }
+
+      const thead = document.getElementById('matrixTableHead');
+      const tbody = document.getElementById('matrixTableBody');
+      const tfoot = document.getElementById('matrixTableFoot');
+      if (!thead || !tbody || !tfoot) return;
+
+      // Calculate per-member monthly attended days & %
+      const memberStats = {};
+      members.forEach(mem => {
+        let attendedDays = 0;
+        allDates.forEach(dt => {
+          const st = getMemberDayRecord(dt, mem.id).status;
+          if (isAttendedStatus(st)) attendedDays++;
+        });
+        const pct = ((attendedDays / standardDays) * 100).toFixed(1);
+        memberStats[mem.id] = { attendedDays, standardDays, pct };
+      });
+
+      // Calculate per-date daily attended count & %
+      const dateStats = {};
+      let grandTotalAttendanceChecks = 0;
+      allDates.forEach(dt => {
+        let attendedCount = 0;
+        members.forEach(mem => {
+          const st = getMemberDayRecord(dt, mem.id).status;
+          if (isAttendedStatus(st)) {
+            attendedCount++;
+            grandTotalAttendanceChecks++;
+          }
+        });
+        const pct = totalMembersCount > 0 ? ((attendedCount / totalMembersCount) * 100).toFixed(1) : '0.0';
+        dateStats[dt] = { attendedCount, totalMembersCount, pct };
+      });
+
+      const overallMonthPct = (totalMembersCount * standardDays) > 0
+        ? ((grandTotalAttendanceChecks / (totalMembersCount * standardDays)) * 100).toFixed(1)
+        : '0.0';
+
+      if (state.matrixOrientation === 'planners_as_rows') {
+        // =====================================================================
+        // ORIENTATION A:
+        // - Top Columns = Month & Dates (1일 ~ 말일)
+        // - Left Rows = Planners (설계사 이름 & 지사 구분)
+        // - End of each Row (Rightmost sticky col) = Planner's Monthly Attended / Standard Days & %
+        // - Bottom of each Column (Footer row) = Daily Total Attended / Total Planners & %
+        // =====================================================================
+        thead.innerHTML = `
+          <tr>
+            <th class="sticky-col-left bg-slate-200 py-2.5 px-3 text-left font-bold text-slate-800 border-r border-slate-300 min-w-[185px]">
+              <div>${y}년 ${m}월</div>
+              <div class="text-[10px] text-slate-500 font-normal">설계사 이름 (수정 · ✕삭제)</div>
+            </th>
+            ${allDates.map(dt => {
+              const dNum = Number(dt.slice(8, 10));
+              const dow = getKoreanDayName(dt);
+              const isSun = dow === '일';
+              const isSat = dow === '토';
+              const isSelected = dt === state.selectedDate;
+              const dayColor = isSun ? 'text-rose-600' : isSat ? 'text-blue-600' : 'text-slate-700';
+              return `
+                <th class="py-1.5 px-1 text-center border-r border-slate-200 min-w-[38px] ${isSelected ? 'bg-blue-100/90 ring-1 ring-blue-400' : ''}">
+                  <button type="button" onclick="markAllPresentForDate('${dt}')" title="${dt} 전원 출근 토글" class="w-full flex flex-col items-center hover:opacity-75">
+                    <span class="text-[11px] font-bold ${dayColor}">${dNum}</span>
+                    <span class="text-[9px] ${dayColor}">${dow}</span>
+                  </button>
+                </th>
+              `;
+            }).join('')}
+            <th class="sticky-col-right bg-indigo-950 text-white py-2 px-3 text-center font-bold border-l border-indigo-800 min-w-[130px]">
+              <div>월 출근일 / 기준일</div>
+              <div class="text-[10px] text-indigo-200 font-normal">개인 출근율 (%)</div>
+            </th>
+          </tr>
+        `;
+
+        tbody.innerHTML = members.map((mem, idx) => {
+          const stInfo = memberStats[mem.id];
+          const pctNum = parseFloat(stInfo.pct);
+          const pctBadgeCls = pctNum >= 90
+            ? 'bg-emerald-100 text-emerald-800'
+            : pctNum >= 75
+            ? 'bg-blue-100 text-blue-800'
+            : 'bg-rose-100 text-rose-800';
+
+          const dateCells = allDates.map(dt => {
+            const rec = getMemberDayRecord(dt, mem.id);
+            const disp = getMatrixCellShortDisplay(rec.status);
+            const isSelected = dt === state.selectedDate;
+            return `
+              <td class="p-1 text-center border-r border-slate-100 ${isSelected ? 'bg-blue-50/50' : ''}">
+                <button type="button" onclick="handleMatrixCellClick('${mem.id}', '${dt}')"
+                  class="w-7 h-7 rounded-lg border text-[11px] flex items-center justify-center mx-auto transition ${disp.cls}"
+                  title="${mem.name} (${dt}): ${rec.status}">
+                  ${disp.sym}
+                </button>
+              </td>
+            `;
+          }).join('');
+
+          return `
+            <tr class="hover:bg-slate-50/90">
+              <td class="sticky-col-left bg-white py-1.5 px-2 border-r border-slate-200 shadow-2xs">
+                <div class="flex items-center justify-between gap-1">
+                  <div class="flex items-center gap-1 min-w-0">
+                    <span class="text-[10px] font-mono text-slate-400 w-4 shrink-0">${idx + 1}</span>
+                    <input type="text" value="${mem.name.replace(/"/g, '&quot;')}"
+                      onchange="updateMemberNameInline('${mem.id}', this.value)"
+                      class="w-16 sm:w-20 font-bold text-slate-900 text-xs bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none px-0.5" />
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 shrink-0">${formatShortBranchName(mem.branch)}</span>
+                  </div>
+                  <button type="button" onclick="quickDeleteMember('${mem.id}')" title="${mem.name} 설계사 삭제"
+                    class="w-5 h-5 rounded-md bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white text-[11px] font-bold flex items-center justify-center shrink-0 transition">
+                    ✕
+                  </button>
+                </div>
+              </td>
+              ${dateCells}
+              <td class="sticky-col-right bg-indigo-50/95 py-1.5 px-3 text-right border-l border-indigo-200 font-bold">
+                <div class="flex items-center justify-end gap-1.5">
+                  <span class="text-slate-800 font-mono text-xs">${stInfo.attendedDays} / ${stInfo.standardDays}일</span>
+                  <span class="px-1.5 py-0.5 rounded text-[11px] font-bold ${pctBadgeCls}">${stInfo.pct}%</span>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('') + `
+          <!-- Quick Add Row Inside Matrix -->
+          <tr class="bg-slate-50/70">
+            <td class="sticky-col-left bg-slate-50 py-2 px-2.5 border-r border-slate-200">
+              <input type="text" placeholder="+ 새 설계사 이름 입력 후 엔터"
+                onkeydown="if(event.key==='Enter'){addNewMemberFromMatrixInput(this);}"
+                onblur="if(this.value.trim()){addNewMemberFromMatrixInput(this);}"
+                class="w-full px-2 py-1 text-xs rounded border border-dashed border-blue-400 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            </td>
+            <td colspan="${allDates.length + 1}" class="py-2 px-3 text-xs text-slate-400">
+              ⬅ 좌측 칸에 설계사 이름을 입력하고 엔터(Enter)를 누르면 행이 즉시 추가됩니다.
+            </td>
+          </tr>
+        `;
+
+        // Footer: Daily Sum (출근 인원 / 전체 인원) & Daily %
+        tfoot.innerHTML = `
+          <tr class="bg-slate-900 text-white border-b border-slate-700">
+            <td class="sticky-col-left bg-slate-900 py-2 px-3 border-r border-slate-700 text-left">
+              <div class="text-xs font-bold text-amber-300">일별 출근 합산</div>
+              <div class="text-[10px] text-slate-300 font-normal">출근인원 / 전체(${totalMembersCount}명)</div>
+            </td>
+            ${allDates.map(dt => {
+              const ds = dateStats[dt];
+              return `
+                <td class="py-1.5 px-0.5 text-center border-r border-slate-800 font-mono text-[10px]">
+                  <div class="font-bold text-white">${ds.attendedCount}/${ds.totalMembersCount}</div>
+                </td>
+              `;
+            }).join('')}
+            <td class="sticky-col-right bg-slate-950 py-2 px-3 text-right border-l border-slate-700">
+              <div class="text-[11px] text-amber-300 font-bold">누적 ${grandTotalAttendanceChecks}건</div>
+            </td>
+          </tr>
+          <tr class="bg-slate-800 text-white">
+            <td class="sticky-col-left bg-slate-800 py-2 px-3 border-r border-slate-700 text-left">
+              <div class="text-xs font-bold text-emerald-300">일별 출근율 (%)</div>
+              <div class="text-[10px] text-slate-300 font-normal">전체 인원 대비 %</div>
+            </td>
+            ${allDates.map(dt => {
+              const ds = dateStats[dt];
+              const pctVal = parseFloat(ds.pct);
+              const colorCls = pctVal >= 85 ? 'text-emerald-300' : pctVal >= 60 ? 'text-amber-300' : 'text-slate-400';
+              return `
+                <td class="py-1.5 px-0.5 text-center border-r border-slate-700 font-mono text-[10px] ${colorCls}">
+                  ${ds.pct}%
+                </td>
+              `;
+            }).join('')}
+            <td class="sticky-col-right bg-slate-950 py-2 px-3 text-right border-l border-slate-700">
+              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-xs font-bold">월평균 ${overallMonthPct}%</span>
+            </td>
+          </tr>
+        `;
+      } else {
+        // =====================================================================
+        // ORIENTATION B (TRANSPOSED):
+        // - Rows = Month & Dates (11/1 ~ 11/30)
+        // - Columns = Planner Names (설계사 이름)
+        // - Right end of each Date Row = That Date's Attended Count / Total Planners & %
+        // - Bottom of each Planner Column = That Planner's Monthly Attended Days / Standard Days & %
+        // =====================================================================
+        thead.innerHTML = `
+          <tr>
+            <th class="sticky-col-left bg-slate-200 py-2.5 px-3 text-left font-bold text-slate-800 border-r border-slate-300 min-w-[115px]">
+              <div>${y}년 ${m}월</div>
+              <div class="text-[10px] text-slate-500 font-normal">해당월 · 날짜 (행)</div>
+            </th>
+            ${members.map(mem => `
+              <th class="py-2 px-1.5 text-center border-r border-slate-200 min-w-[86px] bg-slate-100 relative group">
+                <div class="flex items-center justify-center gap-0.5">
+                  <input type="text" value="${mem.name.replace(/"/g, '&quot;')}"
+                    onchange="updateMemberNameInline('${mem.id}', this.value)"
+                    class="w-14 text-center font-bold text-slate-900 text-xs bg-transparent border-b border-transparent hover:border-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none" />
+                  <button type="button" onclick="quickDeleteMember('${mem.id}')" title="${mem.name} 삭제"
+                    class="w-4 h-4 rounded bg-rose-100 hover:bg-rose-600 text-rose-600 hover:text-white text-[10px] font-bold flex items-center justify-center shrink-0 transition">
+                    ✕
+                  </button>
+                </div>
+                <div class="text-[10px] text-slate-500 font-normal mt-0.5">${formatShortBranchName(mem.branch)}</div>
+              </th>
+            `).join('')}
+            <th class="py-2 px-2 bg-slate-100 border-r border-slate-200 min-w-[110px]">
+              <input type="text" placeholder="+ 설계사 열 추가"
+                onkeydown="if(event.key==='Enter'){addNewMemberFromMatrixInput(this);}"
+                onblur="if(this.value.trim()){addNewMemberFromMatrixInput(this);}"
+                class="w-full px-1.5 py-1 text-[11px] rounded border border-dashed border-blue-400 bg-white focus:outline-none" />
+            </th>
+            <th class="sticky-col-right bg-indigo-950 text-white py-2 px-3 text-center font-bold border-l border-indigo-800 min-w-[135px]">
+              <div>일별 출근 합산</div>
+              <div class="text-[10px] text-indigo-200 font-normal">출근인원 / 전체 (%)</div>
+            </th>
+          </tr>
+        `;
+
+        tbody.innerHTML = allDates.map(dt => {
+          const dow = getKoreanDayName(dt);
+          const isSun = dow === '일';
+          const isSat = dow === '토';
+          const isSelected = dt === state.selectedDate;
+          const dayColor = isSun ? 'text-rose-600' : isSat ? 'text-blue-600' : 'text-slate-800';
+          const ds = dateStats[dt];
+          const pctNum = parseFloat(ds.pct);
+          const badgeCls = pctNum >= 85 ? 'bg-emerald-100 text-emerald-800' : pctNum >= 60 ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700';
+
+          const memberCells = members.map(mem => {
+            const rec = getMemberDayRecord(dt, mem.id);
+            const disp = getMatrixCellShortDisplay(rec.status);
+            return `
+              <td class="p-1 text-center border-r border-slate-100">
+                <button type="button" onclick="handleMatrixCellClick('${mem.id}', '${dt}')"
+                  class="w-8 h-7 rounded-lg border text-[11px] flex items-center justify-center mx-auto transition ${disp.cls}">
+                  ${disp.sym}
+                </button>
+              </td>
+            `;
+          }).join('');
+
+          return `
+            <tr class="hover:bg-slate-50 ${isSelected ? 'bg-blue-50/60' : ''}">
+              <td class="sticky-col-left bg-white py-1.5 px-3 border-r border-slate-200 font-semibold ${dayColor}">
+                <button type="button" onclick="markAllPresentForDate('${dt}')" class="text-left hover:underline">
+                  ${Number(dt.slice(5, 7))}월 ${Number(dt.slice(8, 10))}일 (${dow})
+                </button>
+              </td>
+              ${memberCells}
+              <td class="border-r border-slate-100 bg-slate-50/40"></td>
+              <td class="sticky-col-right bg-indigo-50/95 py-1.5 px-3 text-right border-l border-indigo-200 font-bold">
+                <div class="flex items-center justify-end gap-1.5">
+                  <span class="font-mono text-slate-800 text-xs">${ds.attendedCount} / ${ds.totalMembersCount}명</span>
+                  <span class="px-1.5 py-0.5 rounded text-[11px] font-bold ${badgeCls}">${ds.pct}%</span>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        // Footer: Planner Monthly Attended Days / Standard Days & %
+        tfoot.innerHTML = `
+          <tr class="bg-slate-900 text-white border-b border-slate-700">
+            <td class="sticky-col-left bg-slate-900 py-2 px-3 border-r border-slate-700 text-left">
+              <div class="text-xs font-bold text-amber-300">월 출근일 / 기준일</div>
+              <div class="text-[10px] text-slate-300 font-normal">기준 ${standardDays}일 대비</div>
+            </td>
+            ${members.map(mem => {
+              const st = memberStats[mem.id];
+              return `
+                <td class="py-2 px-1 text-center border-r border-slate-800 font-mono text-xs font-bold text-white">
+                  ${st.attendedDays} / ${st.standardDays}일
+                </td>
+              `;
+            }).join('')}
+            <td class="bg-slate-900"></td>
+            <td class="sticky-col-right bg-slate-950 py-2 px-3 text-right border-l border-slate-700 text-amber-300 font-bold">
+              총 ${grandTotalAttendanceChecks}일 출석
+            </td>
+          </tr>
+          <tr class="bg-slate-800 text-white">
+            <td class="sticky-col-left bg-slate-800 py-2 px-3 border-r border-slate-700 text-left">
+              <div class="text-xs font-bold text-emerald-300">개인별 월 출근율(%)</div>
+              <div class="text-[10px] text-slate-300 font-normal">전체 출근일수 대비 %</div>
+            </td>
+            ${members.map(mem => {
+              const st = memberStats[mem.id];
+              const p = parseFloat(st.pct);
+              const cls = p >= 90 ? 'text-emerald-300' : p >= 75 ? 'text-amber-300' : 'text-rose-300';
+              return `
+                <td class="py-2 px-1 text-center border-r border-slate-700 font-mono text-xs font-bold ${cls}">
+                  ${st.pct}%
+                </td>
+              `;
+            }).join('')}
+            <td class="bg-slate-800"></td>
+            <td class="sticky-col-right bg-slate-950 py-2 px-3 text-right border-l border-slate-700">
+              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-xs font-bold">평균 ${overallMonthPct}%</span>
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    function renderKPIs() {
+      const list = getFilteredMembersForBranch();
+      const ds = state.selectedDate;
+      let present = 0, field = 0, late = 0, leave = 0, absent = 0, unchecked = 0;
+
+      list.forEach(m => {
+        const st = getMemberDayRecord(ds, m.id).status;
+        if (st === '출근') present++;
+        else if (st === '외근') field++;
+        else if (st === '지각') late++;
+        else if (st === '휴가') leave++;
+        else if (st === '결근') absent++;
+        else unchecked++;
+      });
+
+      const total = list.length;
+      const attended = present + field + late;
+      const rate = total > 0 ? ((attended / total) * 100).toFixed(1) : '0.0';
+
+      document.getElementById('kpiTotalCount').textContent = `${total}명`;
+      document.getElementById('kpiRateBadge').textContent = `출근율 ${rate}%`;
+      document.getElementById('kpiPresentCount').textContent = `${present}명`;
+      document.getElementById('kpiFieldCount').textContent = `${field}명`;
+      document.getElementById('kpiLateCount').textContent = `${late}명`;
+      document.getElementById('kpiLeaveCount').textContent = `${leave}명`;
+      document.getElementById('kpiAbsentCount').textContent = `${absent + unchecked}명`;
+      document.getElementById('kpiUncheckedSub').textContent = `미체크 ${unchecked}`;
+
+      const headerSummary = document.getElementById('headerSummaryText');
+      if (headerSummary) {
+        headerSummary.textContent = `${state.selectedDate} (${getKoreanDayName(state.selectedDate)}) | 대상 ${total}명 중 출석 ${attended}명 (${rate}%)`;
+      }
+    }
+
+    function getStatusBadgeClasses(status) {
+      switch (status) {
+        case '출근': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+        case '외근': return 'bg-blue-100 text-blue-800 border-blue-300';
+        case '지각': return 'bg-amber-100 text-amber-800 border-amber-300';
+        case '휴가': return 'bg-purple-100 text-purple-800 border-purple-300';
+        case '결근': return 'bg-rose-100 text-rose-800 border-rose-300';
+        default: return 'bg-slate-100 text-slate-500 border-slate-200';
+      }
+    }
+
+    function renderDailyCheckinList() {
+      const container = document.getElementById('dailyPlannerGrid');
+      if (!container) return;
+
+      const query = (document.getElementById('searchPlannerInput')?.value || '').trim().toLowerCase();
+      const clearBtn = document.getElementById('btnClearSearch');
+      if (clearBtn) clearBtn.classList.toggle('hidden', !query);
+
+      const ds = state.selectedDate;
+      const filtered = getFilteredMembersForBranch().filter(m => {
+        const rec = getMemberDayRecord(ds, m.id);
+        if (state.statusFilter !== '전체' && rec.status !== state.statusFilter) return false;
+        if (query) {
+          const hay = `${m.name} ${m.branch} ${m.roleTitle} ${rec.note || ''}`.toLowerCase();
+          if (!hay.includes(query)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full bg-white rounded-2xl p-8 text-center border border-slate-200">
+            <p class="text-sm font-semibold text-slate-700">조건에 해당하는 설계사가 없습니다.</p>
+            <p class="text-xs text-slate-400 mt-1">검색어나 상단 지사·상태 필터를 변경해 보세요.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const statuses = [
+        { key: '출근', label: '출근', activeCls: 'bg-emerald-600 text-white border-emerald-600 shadow-xs', idleCls: 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50' },
+        { key: '외근', label: '외근·미팅', activeCls: 'bg-blue-600 text-white border-blue-600 shadow-xs', idleCls: 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50' },
+        { key: '지각', label: '지각', activeCls: 'bg-amber-500 text-white border-amber-500 shadow-xs', idleCls: 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50' },
+        { key: '휴가', label: '휴가·반차', activeCls: 'bg-purple-600 text-white border-purple-600 shadow-xs', idleCls: 'bg-white text-slate-700 border-slate-200 hover:bg-purple-50' },
+        { key: '결근', label: '결근', activeCls: 'bg-rose-600 text-white border-rose-600 shadow-xs', idleCls: 'bg-white text-slate-700 border-slate-200 hover:bg-rose-50' }
+      ];
+
+      container.innerHTML = filtered.map(m => {
+        const rec = getMemberDayRecord(ds, m.id);
+        const badgeCls = getStatusBadgeClasses(rec.status);
+        const managerTag = m.isManager
+          ? `<span class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-indigo-50 text-indigo-700 border border-indigo-200">관리자</span>`
+          : '';
+
+        const btnsHtml = statuses.map(st => {
+          const isSelected = rec.status === st.key;
+          return `
+            <button type="button" onclick="setMemberAttendance('${m.id}', '${st.key}')"
+              class="status-btn flex-1 py-2 px-1.5 rounded-xl border text-xs font-bold text-center ${isSelected ? st.activeCls : st.idleCls}">
+              ${st.label}
+            </button>
+          `;
+        }).join('');
+
+        return `
+          <div class="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-xs hover:border-slate-300 transition flex flex-col gap-3">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-xs text-slate-700 shrink-0">
+                  ${m.name.slice(0, 2)}
+                </div>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="font-bold text-sm text-slate-900">${m.name}</span>
+                    <span class="text-xs text-slate-500 font-medium">${m.roleTitle}</span>
+                    <span class="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-slate-100 text-slate-700">${formatShortBranchName(m.branch)}</span>
+                    ${managerTag}
+                  </div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">
+                    체크시각: <span class="font-mono text-slate-600 font-medium">${rec.time || '-'}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span class="px-2.5 py-1 rounded-full text-xs font-bold border ${badgeCls}">
+                  ${rec.status}
+                </span>
+                <button type="button" onclick="quickDeleteMember('${m.id}')" title="${m.name} 삭제"
+                  class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white text-xs font-bold border border-rose-200 transition">
+                  삭제
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              ${btnsHtml}
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <input type="text" value="${(rec.note || '').replace(/"/g, '&quot;')}"
+                onchange="updateMemberNote('${m.id}', this.value)"
+                placeholder="외근지·미팅·특이사항 메모 입력 (예: 병원 인하우스, 차집사DB 미팅)"
+                class="flex-1 px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:bg-white focus:border-blue-400" />
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // =========================================================================
+    // 7. WEEKLY VIEW & CHARTS
+    // =========================================================================
+    function getWeekDates(baseDateStr) {
+      const d = new Date(baseDateStr + 'T00:00:00');
+      const day = d.getDay();
+      const diffToMon = day === 0 ? -6 : 1 - day;
+      const mon = new Date(d);
+      mon.setDate(d.getDate() + diffToMon);
+
+      const dates = [];
+      for (let i = 0; i < 5; i++) { // 월~금 (토·일 제외)
+        const cur = new Date(mon);
+        cur.setDate(mon.getDate() + i);
+        dates.push(formatDateStr(cur));
+      }
+      return dates;
+    }
+
+    function renderWeeklyView() {
+      const weekDates = getWeekDates(state.selectedDate);
+      const dayLabels = ['월', '화', '수', '목', '금'];
+      const sub = document.getElementById('weeklyRangeSubtitle');
+      if (sub) {
+        sub.textContent = `조회 주간: ${weekDates[0]} (월) ~ ${weekDates[4]} (금) [토·일 제외] | 지정 관리자(${state.currentUser.name} ${state.currentUser.roleTitle}) 열람 중`;
+      }
+
+      const headRow = document.getElementById('weeklyTableHeadRow');
+      if (headRow) {
+        headRow.innerHTML = `
+          <th class="py-3 px-4">설계사</th>
+          <th class="py-3 px-2 text-center">구분</th>
+          ${weekDates.map((dt, idx) => `
+            <th class="py-3 px-2 text-center ${dt === state.selectedDate ? 'bg-blue-50 text-blue-700' : ''}">
+              <div>${dayLabels[idx]}</div>
+              <div class="text-[10px] font-mono text-slate-400">${dt.slice(5)}</div>
+            </th>
+          `).join('')}
+          <th class="py-3 px-3 text-center">주간 출석 / 기준</th>
+          <th class="py-3 px-4 text-right">주간 출근율</th>
+        `;
+      }
+
+      const members = getFilteredMembersForBranch();
+      const tbody = document.getElementById('weeklyTableBody');
+      if (tbody) {
+        tbody.innerHTML = members.map(m => {
+          let workDays = 0;
+          const weekdayCount = 5;
+          const cells = weekDates.map((dt, idx) => {
+            const rec = getMemberDayRecord(dt, m.id);
+            if (idx < 5 && isAttendedStatus(rec.status)) {
+              workDays++;
+            } else if (idx === 5 && (rec.status === '출근' || rec.status === '외근')) {
+              workDays++;
+            }
+            const cls = getStatusBadgeClasses(rec.status);
+            return `
+              <td class="py-2.5 px-1.5 text-center ${dt === state.selectedDate ? 'bg-blue-50/30' : ''}">
+                <button type="button" onclick="cycleWeeklyCellStatus('${m.id}', '${dt}')"
+                  class="px-2 py-1 rounded-lg text-[11px] font-bold border ${cls} hover:opacity-80 transition">
+                  ${rec.status}
+                </button>
+              </td>
+            `;
+          }).join('');
+
+          const rate = Math.min(100, Math.round((workDays / weekdayCount) * 100));
+          const rateColor = rate >= 90 ? 'text-emerald-700 bg-emerald-50' : rate >= 75 ? 'text-blue-700 bg-blue-50' : 'text-rose-700 bg-rose-50';
+
+          return `
+            <tr class="hover:bg-slate-50/80">
+              <td class="py-2.5 px-4 font-semibold text-slate-900">
+                ${m.name} <span class="text-[11px] font-normal text-slate-500">${m.roleTitle}</span>
+              </td>
+              <td class="py-2.5 px-2 text-center text-xs text-slate-600">${formatShortBranchName(m.branch)}</td>
+              ${cells}
+              <td class="py-2.5 px-3 text-center font-semibold text-slate-700">${workDays} / 5일</td>
+              <td class="py-2.5 px-4 text-right">
+                <span class="px-2 py-0.5 rounded-full text-xs font-bold ${rateColor}">${rate}%</span>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      renderWeeklyCharts(weekDates, dayLabels, members);
+    }
+
+    function renderWeeklyCharts(weekDates, dayLabels, members) {
+      if (typeof Chart === 'undefined') return;
+
+      const presentSeries = [];
+      const fieldSeries = [];
+      const lateAbsentSeries = [];
+
+      weekDates.forEach(dt => {
+        let p = 0, f = 0, la = 0;
+        members.forEach(m => {
+          const st = getMemberDayRecord(dt, m.id).status;
+          if (st === '출근') p++;
+          else if (st === '외근') f++;
+          else if (st === '지각' || st === '결근') la++;
+        });
+        presentSeries.push(p);
+        fieldSeries.push(f);
+        lateAbsentSeries.push(la);
+      });
+
+      const ctx1 = document.getElementById('weeklyTrendChart');
+      if (ctx1) {
+        if (weeklyTrendChartInstance) weeklyTrendChartInstance.destroy();
+        weeklyTrendChartInstance = new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: weekDates.map((d, i) => `${d.slice(5)}(${dayLabels[i]})`),
+            datasets: [
+              { label: '정상출근', data: presentSeries, backgroundColor: '#10b981', borderRadius: 6 },
+              { label: '외근·미팅', data: fieldSeries, backgroundColor: '#3b82f6', borderRadius: 6 },
+              { label: '지각·결근', data: lateAbsentSeries, backgroundColor: '#f43f5e', borderRadius: 6 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+            scales: {
+              x: { stacked: true, grid: { display: false } },
+              y: { stacked: true, beginAtZero: true }
+            }
+          }
+        });
+      }
+
+      const branches = state.branches;
+      const branchRates = branches.map(b => {
+        const bMembers = state.members.filter(m => m.branch === b);
+        if (!bMembers.length) return 0;
+        let attended = 0;
+        const totalPossible = bMembers.length * 5;
+        for (let i = 0; i < 5; i++) {
+          const dt = weekDates[i];
+          bMembers.forEach(m => {
+            const st = getMemberDayRecord(dt, m.id).status;
+            if (isAttendedStatus(st)) attended++;
+          });
+        }
+        return Math.round((attended / totalPossible) * 100);
+      });
+
+      const ctx2 = document.getElementById('weeklyBranchChart');
+      if (ctx2) {
+        if (weeklyBranchChartInstance) weeklyBranchChartInstance.destroy();
+        weeklyBranchChartInstance = new Chart(ctx2, {
+          type: 'bar',
+          data: {
+            labels: branches.map(formatShortBranchName),
+            datasets: [{
+              label: '주간 출근율 (%)',
+              data: branchRates,
+              backgroundColor: ['#2563eb', '#0d9488', '#d97706', '#4f46e5', '#7c3aed', '#db2777'],
+              borderRadius: 8
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } },
+              x: { grid: { display: false } }
+            }
+          }
+        });
+      }
+    }
+
+    // =========================================================================
+    // 8. MONTHLY VIEW & ANALYTICS
+    // =========================================================================
+    function getMonthWeekdays(monthPrefix) {
+      const [y, m] = monthPrefix.split('-').map(Number);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const dates = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dtStr = `${monthPrefix}-${String(d).padStart(2, '0')}`;
+        if (dtStr > TODAY_STR && monthPrefix === '2026-11') continue;
+        const dow = new Date(dtStr + 'T00:00:00').getDay();
+        if (dow !== 0 && dow !== 6) {
+          dates.push(dtStr);
+        }
+      }
+      return dates;
+    }
+
+    function renderMonthlyView() {
+      const monthPrefix = state.selectedMonth;
+      const titleEl = document.getElementById('monthlyTitleText');
+      if (titleEl) {
+        const [y, m] = monthPrefix.split('-');
+        titleEl.textContent = `${y}년 ${Number(m)}월 월간 출결 종합 데이터`;
+      }
+
+      const workdays = getMonthWeekdays(monthPrefix);
+      const denom = Math.max(1, workdays.length);
+      const members = getFilteredMembersForBranch();
+      let totalP = 0, totalF = 0, totalL = 0, totalV = 0, totalA = 0;
+
+      const statsList = members.map(m => {
+        let p = 0, f = 0, l = 0, v = 0, a = 0;
+        workdays.forEach(dt => {
+          const st = getMemberDayRecord(dt, m.id).status;
+          if (st === '출근') { p++; totalP++; }
+          else if (st === '외근') { f++; totalF++; }
+          else if (st === '지각') { l++; totalL++; }
+          else if (st === '휴가') { v++; totalV++; }
+          else if (st === '결근') { a++; totalA++; }
+        });
+        const attended = p + f + l;
+        const rate = Math.round((attended / denom) * 100);
+        return { member: m, p, f, l, v, a, attended, denom, rate };
+      });
+
+      const sortMode = document.getElementById('monthlySortSelect')?.value || 'rate_desc';
+      statsList.sort((x, y) => {
+        if (sortMode === 'rate_desc') return y.rate - x.rate || y.attended - x.attended;
+        if (sortMode === 'rate_asc') return x.rate - y.rate;
+        if (sortMode === 'late_desc') return (y.l + y.a) - (x.l + x.a);
+        return x.member.branch.localeCompare(y.member.branch) || x.member.name.localeCompare(y.member.name);
+      });
+
+      const tbody = document.getElementById('monthlyTableBody');
+      if (tbody) {
+        tbody.innerHTML = statsList.map((item, idx) => {
+          const m = item.member;
+          const badge = item.rate >= 95
+            ? `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] rounded bg-emerald-100 text-emerald-800 font-bold">우수</span>`
+            : item.rate < 80
+            ? `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] rounded bg-rose-100 text-rose-800 font-bold">점검</span>`
+            : '';
+
+          return `
+            <tr class="hover:bg-slate-50 cursor-pointer" onclick="openMemberDetailModal('${m.id}')">
+              <td class="py-3 px-4 font-mono text-xs text-slate-500">${idx + 1}</td>
+              <td class="py-3 px-4">
+                <span class="font-bold text-slate-900 underline decoration-slate-300 underline-offset-2">${m.name}</span>
+                <span class="text-xs text-slate-500 ml-1">${m.roleTitle}</span>
+                ${badge}
+              </td>
+              <td class="py-3 px-3 text-center text-xs text-slate-600">${formatShortBranchName(m.branch)}</td>
+              <td class="py-3 px-3 text-center font-semibold text-emerald-700">${item.p}일</td>
+              <td class="py-3 px-3 text-center font-semibold text-blue-700">${item.f}일</td>
+              <td class="py-3 px-3 text-center font-semibold text-amber-700">${item.l}회</td>
+              <td class="py-3 px-3 text-center font-semibold text-purple-700">${item.v}일</td>
+              <td class="py-3 px-3 text-center font-semibold text-rose-700">${item.a}일</td>
+              <td class="py-3 px-4 text-right">
+                <div class="inline-flex items-center gap-2">
+                  <span class="font-mono text-xs text-slate-600">${item.attended}/${item.denom}일</span>
+                  <span class="font-bold text-slate-900">(${item.rate}%)</span>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      const totalLabel = document.getElementById('monthlyTotalDaysLabel');
+      if (totalLabel) {
+        totalLabel.textContent = `경과 영업일 ${workdays.length}일 기준`;
+      }
+
+      renderMonthlyCharts(workdays, members, { totalP, totalF, totalL, totalV, totalA });
+    }
+
+    function renderMonthlyCharts(workdays, members, totals) {
+      if (typeof Chart === 'undefined') return;
+
+      const dailyRates = workdays.map(dt => {
+        if (!members.length) return 0;
+        let ok = 0;
+        members.forEach(m => {
+          const st = getMemberDayRecord(dt, m.id).status;
+          if (isAttendedStatus(st)) ok++;
+        });
+        return Math.round((ok / members.length) * 100);
+      });
+
+      const ctxLine = document.getElementById('monthlyDailyRateChart');
+      if (ctxLine) {
+        if (monthlyDailyRateChartInstance) monthlyDailyRateChartInstance.destroy();
+        monthlyDailyRateChartInstance = new Chart(ctxLine, {
+          type: 'line',
+          data: {
+            labels: workdays.map(d => d.slice(5)),
+            datasets: [{
+              label: '일별 출근율 (%)',
+              data: dailyRates,
+              borderColor: '#4f46e5',
+              backgroundColor: 'rgba(79, 70, 229, 0.12)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 3
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { min: 0, max: 100, ticks: { callback: v => v + '%' } },
+              x: { grid: { display: false } }
+            }
+          }
+        });
+      }
+
+      const ctxDoughnut = document.getElementById('monthlyTypeDoughnutChart');
+      if (ctxDoughnut) {
+        if (monthlyTypeDoughnutChartInstance) monthlyTypeDoughnutChartInstance.destroy();
+        monthlyTypeDoughnutChartInstance = new Chart(ctxDoughnut, {
+          type: 'doughnut',
+          data: {
+            labels: ['정상출근', '외근·미팅', '지각', '휴가·반차', '결근'],
+            datasets: [{
+              data: [totals.totalP, totals.totalF, totals.totalL, totals.totalV, totals.totalA],
+              backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#f43f5e']
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { boxWidth: 11, font: { size: 11 } } }
+            }
+          }
+        });
+      }
+    }
+
+    // =========================================================================
+    // 9. MEMBERS & DESIGNATED MANAGERS MANAGEMENT
+    // =========================================================================
+    function renderMembersView() {
+      const managers = state.members.filter(m => m.isManager);
+      const badge = document.getElementById('managerCountBadge');
+      if (badge) badge.textContent = `지정 관리자 ${managers.length}명`;
+
+      const pillsEl = document.getElementById('designatedManagersPills');
+      if (pillsEl) {
+        pillsEl.innerHTML = managers.map(m => `
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-xs">
+            <span class="font-bold text-blue-950">${m.name}</span>
+            <span class="text-blue-700">${m.roleTitle} (${formatShortBranchName(m.branch)})</span>
+            <span class="px-1.5 py-0.2 rounded bg-white text-slate-600 text-[10px] border border-blue-100">열람: ${m.scope || m.branch}</span>
+          </div>
+        `).join('');
+      }
+
+      const rosterBody = document.getElementById('rosterTableBody');
+      if (rosterBody) {
+        const list = getFilteredMembersForBranch();
+        rosterBody.innerHTML = list.map(m => `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2.5 px-4">
+              <input type="text" value="${m.name.replace(/"/g, '&quot;')}"
+                onchange="updateMemberNameInline('${m.id}', this.value)"
+                class="font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none text-xs sm:text-sm w-28" />
+              <div class="text-[11px] text-slate-500">${m.roleTitle}</div>
+            </td>
+            <td class="py-2.5 px-3">
+              <select onchange="changeMemberBranch('${m.id}', this.value)" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+                ${state.branches.map(b => `<option value="${b}" ${m.branch === b ? 'selected' : ''}>${formatShortBranchName(b)} (${b})</option>`).join('')}
+              </select>
+            </td>
+            <td class="py-2.5 px-3 text-xs font-mono text-slate-600">${m.phone || '-'}</td>
+            <td class="py-2.5 px-3 text-center">
+              <select onchange="changeMemberScope('${m.id}', this.value)" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1" ${!m.isManager ? 'disabled' : ''}>
+                <option value="전체지사" ${m.scope === '전체지사' ? 'selected' : ''}>전체 지사 열람</option>
+                <option value="${m.branch}" ${m.scope === m.branch ? 'selected' : ''}>소속 지사만</option>
+              </select>
+            </td>
+            <td class="py-2.5 px-3 text-center">
+              <input type="checkbox" ${m.isManager ? 'checked' : ''} onchange="toggleManagerPermission('${m.id}', this.checked)"
+                class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+            </td>
+            <td class="py-2.5 px-4 text-right">
+              <button type="button" onclick="quickDeleteMember('${m.id}')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white text-xs font-bold transition">삭제</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    function addSingleMember() {
+      const nameEl = document.getElementById('newMemberName');
+      const branchEl = document.getElementById('newMemberBranch');
+      const roleEl = document.getElementById('newMemberRoleTitle');
+      const phoneEl = document.getElementById('newMemberPhone');
+      const isMgrEl = document.getElementById('newMemberIsManager');
+
+      const name = (nameEl?.value || '').trim();
+      if (!name) {
+        showToast('설계사 이름을 입력해 주세요.', 'error');
+        return;
+      }
+
+      const branch = branchEl?.value || '대전지사';
+      const roleTitle = roleEl?.value || '설계사';
+      const phone = (phoneEl?.value || '').trim();
+      const isManager = !!isMgrEl?.checked;
+
+      const newMember = {
+        id: 'm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        name,
+        branch,
+        roleTitle,
+        phone,
+        isManager,
+        scope: isManager ? (roleTitle === '대표' ? '전체지사' : branch) : '본인'
+      };
+
+      state.members.push(newMember);
+      if (nameEl) nameEl.value = '';
+      if (phoneEl) phoneEl.value = '';
+      if (isMgrEl) isMgrEl.checked = false;
+
+      saveState();
+      renderAll();
+      showToast(`${name} (${formatShortBranchName(branch)}) 설계사가 등록되었습니다.`);
+    }
+
+    function normalizeBranchInput(rawBranch, fallback) {
+      if (!rawBranch) return fallback;
+      const cleaned = rawBranch.trim();
+      if (state.branches.includes(cleaned)) return cleaned;
+      if (state.branches.includes(cleaned + '지사')) return cleaned + '지사';
+      // If user typed a brand-new division name in bulk upload, auto-register it!
+      state.branches.push(cleaned);
+      return cleaned;
+    }
+
+    function addBulkMembers() {
+      const ta = document.getElementById('bulkMemberTextarea');
+      const defaultBranch = document.getElementById('bulkDefaultBranch')?.value || '대전지사';
+      const raw = (ta?.value || '').trim();
+      if (!raw) {
+        showToast('일괄 등록할 이름을 입력해 주세요.', 'error');
+        return;
+      }
+
+      const lines = raw.split(/\n+/).map(l => l.trim()).filter(Boolean);
+      let addedCount = 0;
+
+      lines.forEach(line => {
+        const parts = line.split(',').map(p => p.trim()).filter(Boolean);
+        if (!parts.length) return;
+
+        const knownBranchKeywords = [...state.branches, ...state.branches.map(formatShortBranchName)];
+        if (parts.length > 1 && !knownBranchKeywords.includes(parts[1])) {
+          parts.forEach(singleName => {
+            state.members.push({
+              id: 'm_' + Date.now() + '_' + Math.floor(Math.random() * 10000) + '_' + addedCount,
+              name: singleName,
+              branch: defaultBranch,
+              roleTitle: '설계사',
+              phone: '',
+              isManager: false,
+              scope: '본인'
+            });
+            addedCount++;
+          });
+        } else {
+          const name = parts[0];
+          const branch = normalizeBranchInput(parts[1], defaultBranch);
+          const roleTitle = parts[2] || '설계사';
+          const isManager = roleTitle === '지점장' || roleTitle === '대표';
+          state.members.push({
+            id: 'm_' + Date.now() + '_' + Math.floor(Math.random() * 10000) + '_' + addedCount,
+            name,
+            branch,
+            roleTitle,
+            phone: parts[3] || '',
+            isManager,
+            scope: isManager ? branch : '본인'
+          });
+          addedCount++;
+        }
+      });
+
+      if (ta) ta.value = '';
+      saveState();
+      renderAll();
+      showToast(`총 ${addedCount}명의 설계사가 일괄 등록되었습니다!`);
+    }
+
+    function toggleManagerPermission(memberId, checked) {
+      const m = state.members.find(x => x.id === memberId);
+      if (!m) return;
+      m.isManager = checked;
+      m.scope = checked ? (m.roleTitle === '대표' ? '전체지사' : m.branch) : '본인';
+      saveState();
+      renderMembersView();
+      showToast(`${m.name}님의 관리자 열람 권한이 ${checked ? '부여' : '해제'}되었습니다.`);
+    }
+
+    function changeMemberBranch(memberId, newBranch) {
+      const m = state.members.find(x => x.id === memberId);
+      if (!m) return;
+      m.branch = newBranch;
+      saveState();
+      renderAll();
+      showToast(`${m.name}님의 소속 구분이 ${formatShortBranchName(newBranch)}(으)로 변경되었습니다.`);
+    }
+
+    function changeMemberScope(memberId, newScope) {
+      const m = state.members.find(x => x.id === memberId);
+      if (!m) return;
+      m.scope = newScope;
+      saveState();
+      renderMembersView();
+      showToast(`${m.name} 관리자의 열람 범위가 [${newScope}]로 변경되었습니다.`);
+    }
+
+    function deleteMember(memberId) {
+      const m = state.members.find(x => x.id === memberId);
+      if (!m) return;
+      openConfirmModal(
+        '설계사 명단 삭제',
+        `정말 [${m.name} (${formatShortBranchName(m.branch)})] 인원을 명단에서 삭제하시겠습니까?`,
+        () => {
+          state.members = state.members.filter(x => x.id !== memberId);
+          saveState();
+          renderAll();
+          showToast(`${m.name} 인원이 삭제되었습니다.`, 'info');
+        }
+      );
+    }
+
+    function updateAdminPin(val) {
+      state.adminPin = (val || '0000').trim();
+      saveState();
+      showToast(`관리자 공통 PIN 번호가 [${state.adminPin}]로 저장되었습니다.`);
+    }
+
+    // =========================================================================
+    // 10. MODALS & EXPORT / REPORT FUNCTIONS
+    // =========================================================================
+    function openAddMemberModal() {
+      populateBranchSelectDropdowns();
+      document.getElementById('modalAddMember')?.classList.remove('hidden');
+    }
+    function closeAddMemberModal() {
+      document.getElementById('modalAddMember')?.classList.add('hidden');
+    }
+    function submitQuickModalMember() {
+      const nameInput = document.getElementById('quickModalNameInput');
+      const branch = document.getElementById('quickModalBranchSelect')?.value || '대전지사';
+      const roleTitle = document.getElementById('quickModalRoleSelect')?.value || '설계사';
+      const isManager = !!document.getElementById('quickModalIsManager')?.checked;
+
+      const raw = (nameInput?.value || '').trim();
+      if (!raw) {
+        showToast('설계사 이름을 입력해 주세요.', 'error');
+        return;
+      }
+
+      const names = raw.split(',').map(s => s.trim()).filter(Boolean);
+      names.forEach((n, idx) => {
+        state.members.push({
+          id: 'm_' + Date.now() + '_' + idx,
+          name: n,
+          branch,
+          roleTitle,
+          phone: '',
+          isManager,
+          scope: isManager ? branch : '본인'
+        });
+      });
+
+      if (nameInput) nameInput.value = '';
+      closeAddMemberModal();
+      saveState();
+      renderAll();
+      showToast(`${names.length}명의 설계사가 등록되었습니다.`);
+    }
+
+    function openRoleModal() {
+      const sel = document.getElementById('roleSelectManager');
+      if (sel) {
+        const managers = state.members.filter(m => m.isManager);
+        sel.innerHTML = managers.map(m => `
+          <option value="${m.id}" ${state.currentUser.managerId === m.id ? 'selected' : ''}>
+            ${m.name} ${m.roleTitle} (${formatShortBranchName(m.branch)} · 열람범위: ${m.scope || m.branch})
+          </option>
+        `).join('');
+      }
+      document.getElementById('modalRoleSwitch')?.classList.remove('hidden');
+    }
+
+    function closeRoleModal() {
+      document.getElementById('modalRoleSwitch')?.classList.add('hidden');
+    }
+
+    function applyManagerRole() {
+      const pin = document.getElementById('rolePinVerifyInput')?.value || '';
+      if (pin !== state.adminPin) {
+        showToast('관리자 PIN 번호가 일치하지 않습니다.', 'error');
+        return;
+      }
+      const mgrId = document.getElementById('roleSelectManager')?.value;
+      const mgr = state.members.find(m => m.id === mgrId) || state.members[0];
+      state.currentUser = {
+        isManagerMode: true,
+        managerId: mgr.id,
+        name: mgr.name,
+        roleTitle: mgr.roleTitle,
+        scope: mgr.scope || '전체지사'
+      };
+
+      if (mgr.scope && mgr.scope !== '전체지사') {
+        state.branchFilter = mgr.branch;
+      } else {
+        state.branchFilter = '전체';
+      }
+
+      document.getElementById('currentRoleLabel').textContent = `관리자: ${mgr.name} ${mgr.roleTitle}`;
+      closeRoleModal();
+      renderAll();
+      showToast(`${mgr.name} ${mgr.roleTitle} (지정 관리자) 권한으로 전환되었습니다.`);
+    }
+
+    function applyGeneralPlannerMode() {
+      state.currentUser = {
+        isManagerMode: false,
+        managerId: '',
+        name: '일반 설계사',
+        roleTitle: '출결체크 전용',
+        scope: '본인'
+      };
+      document.getElementById('currentRoleLabel').textContent = '일반 설계사 모드';
+      closeRoleModal();
+      switchTab('checkin');
+      showToast('일반 설계사 모드로 전환되었습니다.', 'info');
+    }
+
+    function openSyncModal() {
+      const input = document.getElementById('syncWebhookUrlInput');
+      if (input) input.value = state.webhookUrl || '';
+      document.getElementById('modalCloudSync')?.classList.remove('hidden');
+    }
+    function closeSyncModal() {
+      document.getElementById('modalCloudSync')?.classList.add('hidden');
+    }
+
+    function saveWebhookUrl() {
+      const val = (document.getElementById('syncWebhookUrlInput')?.value || '').trim();
+      state.webhookUrl = val;
+      saveState();
+      showToast(val ? '구글 시트 실시간 연동 URL이 저장되었습니다.' : '연동 URL이 해제되었습니다.');
+    }
+
+    function copyAppsScriptTemplate() {
+      const scriptCode = [
+        '// [글로벌금융판매 새길지사] 구글 시트 실시간 출결 연동 Apps Script',
+        'function doPost(e) {',
+        '  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("출결현황") || SpreadsheetApp.getActiveSpreadsheet().insertSheet("출결현황");',
+        '  var data = JSON.parse(e.postData.contents);',
+        '  sheet.appendRow([new Date(), data.date, data.branch, data.name, data.roleTitle, data.status, data.time, data.note]);',
+        '  return ContentService.createTextOutput(JSON.stringify({result: "ok"})).setMimeType(ContentService.MimeType.JSON);',
+        '}'
+      ].join('\n');
+      copyTextToClipboard(scriptCode, '구글 시트 Apps Script 코드가 클립보드에 복사되었습니다!');
+    }
+
+    function exportJsonBackup() {
+      const dataStr = JSON.stringify({
+        exportedAt: new Date().toISOString(),
+        organization: '글로벌금융판매 새길지사',
+        branches: state.branches,
+        members: state.members,
+        attendance: state.attendance
+      }, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `새길지사_출결데이터_${state.selectedDate}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('백업 파일(.json) 다운로드가 완료되었습니다.');
+    }
+
+    function importJsonBackup(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (parsed && Array.isArray(parsed.members)) {
+            state.members = parsed.members;
+            state.attendance = parsed.attendance || {};
+            if (Array.isArray(parsed.branches) && parsed.branches.length) {
+              state.branches = parsed.branches;
+            }
+            saveState();
+            renderAll();
+            closeSyncModal();
+            showToast(`백업 파일에서 설계사 ${state.members.length}명의 데이터를 불러왔습니다!`);
+          } else {
+            showToast('올바른 새길지사 출결 백업 파일이 아닙니다.', 'error');
+          }
+        } catch (err) {
+          showToast('파일을 읽는 중 오류가 발생했습니다.', 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function openMemberDetailModal(memberId) {
+      const m = state.members.find(x => x.id === memberId);
+      if (!m) return;
+      const monthPrefix = state.selectedMonth;
+      document.getElementById('detailModalNameTitle').textContent = `${m.name} ${m.roleTitle} (${formatShortBranchName(m.branch)})`;
+      document.getElementById('detailModalSubTitle').textContent = `${monthPrefix}월 일자별 상세 출결 기록`;
+
+      const [y, mon] = monthPrefix.split('-').map(Number);
+      const daysInMonth = new Date(y, mon, 0).getDate();
+      let p = 0, f = 0, l = 0, v = 0, a = 0;
+
+      const dayCells = ['일', '월', '화', '수', '목', '금', '토'].map(d =>
+        `<div class="font-bold text-slate-400 py-1">${d}</div>`
+      );
+
+      const firstDow = new Date(`${monthPrefix}-01T00:00:00`).getDay();
+      for (let i = 0; i < firstDow; i++) {
+        dayCells.push(`<div></div>`);
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dtStr = `${monthPrefix}-${String(d).padStart(2, '0')}`;
+        const rec = getMemberDayRecord(dtStr, m.id);
+        if (rec.status === '출근') p++;
+        else if (rec.status === '외근') f++;
+        else if (rec.status === '지각') l++;
+        else if (rec.status === '휴가') v++;
+        else if (rec.status === '결근') a++;
+
+        const cls = getStatusBadgeClasses(rec.status);
+        dayCells.push(`
+          <div class="p-1.5 rounded-xl border ${cls} flex flex-col items-center justify-center min-h-[52px]">
+            <span class="text-[10px] font-mono opacity-75">${d}일</span>
+            <span class="font-bold text-[11px] mt-0.5">${rec.status === '미체크' ? '-' : rec.status}</span>
+          </div>
+        `);
+      }
+
+      document.getElementById('detailModalSummaryRow').innerHTML = `
+        <div class="p-2 rounded-xl bg-emerald-50 text-emerald-800 font-bold">출근 ${p}일</div>
+        <div class="p-2 rounded-xl bg-blue-50 text-blue-800 font-bold">외근 ${f}일</div>
+        <div class="p-2 rounded-xl bg-amber-50 text-amber-800 font-bold">지각 ${l}회</div>
+        <div class="p-2 rounded-xl bg-purple-50 text-purple-800 font-bold">휴가 ${v}일</div>
+        <div class="p-2 rounded-xl bg-rose-50 text-rose-800 font-bold">결근 ${a}일</div>
+      `;
+      document.getElementById('detailModalCalendarGrid').innerHTML = dayCells.join('');
+      document.getElementById('modalMemberDetail')?.classList.remove('hidden');
+    }
+
+    function closeMemberDetailModal() {
+      document.getElementById('modalMemberDetail')?.classList.add('hidden');
+    }
+
+    function openConfirmModal(title, message, callback) {
+      document.getElementById('confirmModalTitle').textContent = title;
+      document.getElementById('confirmModalMessage').textContent = message;
+      pendingConfirmCallback = callback;
+      document.getElementById('modalConfirmAction')?.classList.remove('hidden');
+    }
+    function closeConfirmModal() {
+      pendingConfirmCallback = null;
+      document.getElementById('modalConfirmAction')?.classList.add('hidden');
+    }
+    function executeConfirmCallback() {
+      if (typeof pendingConfirmCallback === 'function') {
+        pendingConfirmCallback();
+      }
+      closeConfirmModal();
+    }
+
+    function openClearRosterModal() {
+      openConfirmModal(
+        '명단 비우기 (새로 시작)',
+        '샘플 설계사 명단을 비우고 김종욱 대표님 계정만 남긴 채 직접 설계사 이름을 입력하시겠습니까?',
+        () => {
+          state.members = [
+            { id: 'm1', name: '김종욱', branch: '대전지사', roleTitle: '대표', phone: '010-8626-9280', isManager: true, scope: '전체지사' }
+          ];
+          state.attendance = {};
+          saveState();
+          renderAll();
+          showToast('명단이 초기화되었습니다. 소속 설계사 이름을 등록해 주세요.');
+        }
+      );
+    }
+
+    function openResetDemoModal() {
+      openConfirmModal(
+        '기본 샘플 명단 복원',
+        '대전·청주·천안·충주 30명 샘플 명단과 주간·월간 데모 데이터를 초기 상태로 복원하시겠습니까?',
+        () => {
+          state.branches = [...DEFAULT_BRANCHES];
+          state.members = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+          state.attendance = buildInitialAttendance(state.members);
+          saveState();
+          renderAll();
+          showToast('기본 30명 샘플 데이터가 복원되었습니다.');
+        }
+      );
+    }
+
+    // =========================================================================
+    // 11. KAKAOTALK BRIEFING COPY & CSV DOWNLOADS (INCLUDING MATRIX CSV)
+    // =========================================================================
+    function copyReportSummary() {
+      const ds = state.selectedDate;
+      const list = getFilteredMembersForBranch();
+      let present = [], field = [], late = [], leave = [], absent = [];
+
+      list.forEach(m => {
+        const rec = getMemberDayRecord(ds, m.id);
+        const label = `${m.name}(${formatShortBranchName(m.branch)})`;
+        if (rec.status === '출근') present.push(label);
+        else if (rec.status === '외근') field.push(rec.note ? `${label}-${rec.note}` : label);
+        else if (rec.status === '지각') late.push(label);
+        else if (rec.status === '휴가') leave.push(label);
+        else absent.push(label);
+      });
+
+      const rate = list.length ? (((present.length + field.length + late.length) / list.length) * 100).toFixed(1) : '0.0';
+      const text = [
+        `📋 [글로벌금융판매 새길지사 일일 출결현황]`,
+        `• 일자: ${ds} (${getKoreanDayName(ds)})`,
+        `• 구분: ${state.branchFilter} 총 ${list.length}명 (출근율 ${rate}%)`,
+        `──────────────────`,
+        `✅ 정상출근 (${present.length}명): ${present.join(', ') || '-'}`,
+        `🚗 외근·미팅 (${field.length}명): ${field.join(', ') || '-'}`,
+        `⏰ 지각 (${late.length}명): ${late.join(', ') || '-'}`,
+        `🏖️ 휴가·반차 (${leave.length}명): ${leave.join(', ') || '-'}`,
+        `⚠️ 미체크·결근 (${absent.length}명): ${absent.join(', ') || '-'}`
+      ].join('\n');
+
+      copyTextToClipboard(text, '카카오톡 공유용 출결 브리핑 텍스트가 복사되었습니다!');
+    }
+
+    function downloadCSV(filename, rows) {
+      const bom = '\uFEFF';
+      const csvContent = bom + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`${filename} 파일이 저장되었습니다.`);
+    }
+
+    function exportMatrixCSV() {
+      const monthPrefix = state.selectedMonth;
+      const allDates = getMonthAllDates(monthPrefix);
+      const standardDays = getStandardWorkdaysCount(monthPrefix, allDates);
+      const members = getFilteredMembersForBranch();
+      const totalMembers = members.length;
+
+      const rows = [];
+      const headers = ['설계사 이름', '구분(지사)', ...allDates.map(d => `${Number(d.slice(8))}일(${getKoreanDayName(d)})`), `출근일수/기준(${standardDays}일)`, '개인출근율(%)'];
+      rows.push(headers);
+
+      members.forEach(mem => {
+        let attended = 0;
+        const dayVals = allDates.map(dt => {
+          const st = getMemberDayRecord(dt, mem.id).status;
+          if (isAttendedStatus(st)) attended++;
+          return st === '미체크' ? '-' : st;
+        });
+        const pct = ((attended / standardDays) * 100).toFixed(1) + '%';
+        rows.push([mem.name, formatShortBranchName(mem.branch), ...dayVals, `${attended}/${standardDays}`, pct]);
+      });
+
+      // Bottom daily totals row
+      const dailySums = allDates.map(dt => {
+        let cnt = 0;
+        members.forEach(mem => {
+          if (isAttendedStatus(getMemberDayRecord(dt, mem.id).status)) cnt++;
+        });
+        return `${cnt}/${totalMembers}명`;
+      });
+      const dailyPcts = allDates.map(dt => {
+        let cnt = 0;
+        members.forEach(mem => {
+          if (isAttendedStatus(getMemberDayRecord(dt, mem.id).status)) cnt++;
+        });
+        return totalMembers > 0 ? ((cnt / totalMembers) * 100).toFixed(1) + '%' : '0.0%';
+      });
+
+      rows.push(['[일별 출근 인원 합산]', `전체 ${totalMembers}명`, ...dailySums, '', '']);
+      rows.push(['[일별 전체대비 출근율(%)]', '%', ...dailyPcts, '', '']);
+
+      downloadCSV(`새길지사_행열출결부_${state.branchFilter}_${monthPrefix}.csv`, rows);
+    }
+
+    function exportWeeklyCSV() {
+      const weekDates = getWeekDates(state.selectedDate);
+      const headers = ['이름', '직책', '소속지사', ...weekDates, '주간출석일수', '주간출근율(%)'];
+      const rows = [headers];
+      getFilteredMembersForBranch().forEach(m => {
+        let work = 0;
+        const statuses = weekDates.map((dt, idx) => {
+          const st = getMemberDayRecord(dt, m.id).status;
+          if (idx < 5 && isAttendedStatus(st)) work++;
+          return st;
+        });
+        const rate = Math.min(100, Math.round((work / 5) * 100));
+        rows.push([m.name, m.roleTitle, m.branch, ...statuses, work, `${rate}%`]);
+      });
+      downloadCSV(`새길지사_주간출결현황_${weekDates[0]}_${weekDates[weekDates.length - 1]}.csv`, rows);
+    }
+
+    function exportMonthlyCSV() {
+      const monthPrefix = state.selectedMonth;
+      const workdays = getMonthWeekdays(monthPrefix);
+      const headers = ['이름', '직책', '소속지사', '정상출근(일)', '외근미팅(일)', '지각(회)', '휴가반차(일)', '결근(일)', '월간출근율(%)'];
+      const rows = [headers];
+      getFilteredMembersForBranch().forEach(m => {
+        let p = 0, f = 0, l = 0, v = 0, a = 0;
+        workdays.forEach(dt => {
+          const st = getMemberDayRecord(dt, m.id).status;
+          if (st === '출근') p++;
+          else if (st === '외근') f++;
+          else if (st === '지각') l++;
+          else if (st === '휴가') v++;
+          else if (st === '결근') a++;
+        });
+        const rate = Math.round(((p + f + l) / Math.max(1, workdays.length)) * 100);
+        rows.push([m.name, m.roleTitle, m.branch, p, f, l, v, a, `${rate}%`]);
+      });
+      downloadCSV(`새길지사_월간출결통계_${monthPrefix}.csv`, rows);
+    }
+
+    function startClock() {
+      const update = () => {
+        const el = document.getElementById('liveClockText');
+        if (!el) return;
+        const now = new Date();
+        el.textContent = now.toTimeString().slice(0, 8);
+      };
+      update();
+      setInterval(update, 1000);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      startClock();
+      renderAll();
+    });
+  </script>
+</body>
+</html>
